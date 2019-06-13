@@ -1,0 +1,14 @@
+*.env
+.idea
+out
+build
+.gradle
+logs
+
+/tdlib
+/tdlibbot
+tdlib.log
+
+/src/main/jni/bin
+/src/main/jni/td
+/src/main/jni/tdlib

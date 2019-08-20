@@ -5,6 +5,7 @@ import com.google.gson.*;
 import java.lang.reflect.Type;
 
 public class Message {
+
     private int messageId;
     private int flags;
     private int peerId;
@@ -79,5 +80,19 @@ public class Message {
             }
             return result;
         }
+    }
+
+    public static class Flags {
+        public static final int UNREAD = 1;
+        public static final int OUTBOX = 2;
+        public static final int REPLIED = 4;
+        public static final int IMPORTANT = 8;
+        public static final int CHAT = 16;
+        public static final int FRIENDS = 32;
+        public static final int SPAM = 64;
+        public static final int DELЕTЕD = 128;
+        public static final int FIXED = 256;
+        public static final int MEDIA = 512;
+        public static final int HIDDEN = 65536;
     }
 }

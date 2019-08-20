@@ -58,29 +58,25 @@ public class AuthHandler implements Consumer<TdApi.UpdateAuthorizationState> {
                 break;
             }
             case TdApi.AuthorizationStateWaitEncryptionKey.CONSTRUCTOR: {
-                telegram.getClient().send(new TdApi.CheckDatabaseEncryptionKey(),
-                        null, Throwable::printStackTrace);
+                telegram.getClient().send(new TdApi.CheckDatabaseEncryptionKey());
                 break;
             }
             case TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR: {
                 if(phoneNumber != null) {
-                    telegram.getClient().send(new TdApi.SetAuthenticationPhoneNumber(Config.PHONE_NUMBER, false, false),
-                            null, Throwable::printStackTrace);
+                    telegram.getClient().send(new TdApi.SetAuthenticationPhoneNumber(Config.PHONE_NUMBER, false, false));
                 } else {
-                    telegram.getClient().send(new TdApi.CheckAuthenticationBotToken(botToken), null, Throwable::printStackTrace);
+                    telegram.getClient().send(new TdApi.CheckAuthenticationBotToken(botToken));
                 }
                 break;
             }
             case TdApi.AuthorizationStateWaitCode.CONSTRUCTOR: {
                 String code = promptString("Please enter authentication code: ");
-                telegram.getClient().send(new TdApi.CheckAuthenticationCode(code, "", ""),
-                        null, Throwable::printStackTrace);
+                telegram.getClient().send(new TdApi.CheckAuthenticationCode(code, "", ""));
                 break;
             }
             case TdApi.AuthorizationStateWaitPassword.CONSTRUCTOR: {
                 String password = promptString("Please enter password: ");
-                telegram.getClient().send(new TdApi.CheckAuthenticationPassword(password),
-                        null, Throwable::printStackTrace);
+                telegram.getClient().send(new TdApi.CheckAuthenticationPassword(password));
                 break;
             }
             case TdApi.AuthorizationStateReady.CONSTRUCTOR:
@@ -130,8 +126,7 @@ public class AuthHandler implements Consumer<TdApi.UpdateAuthorizationState> {
         parameters.systemVersion = "Unknown";
         parameters.applicationVersion = "1.0";
 
-        telegram.getClient().send(new TdApi.SetTdlibParameters(parameters), null,
-                Throwable::printStackTrace);
+        telegram.getClient().send(new TdApi.SetTdlibParameters(parameters));
     }
 
 

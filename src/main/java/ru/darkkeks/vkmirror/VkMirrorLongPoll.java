@@ -4,11 +4,8 @@ import com.vk.api.sdk.client.VkApiClient;
 import com.vk.api.sdk.client.actors.UserActor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.darkkeks.vkmirror.tdlib.TdApi;
 import ru.darkkeks.vkmirror.vk.UserLongPoll;
 import ru.darkkeks.vkmirror.vk.object.Message;
-
-import java.util.concurrent.ExecutionException;
 
 public class VkMirrorLongPoll extends UserLongPoll {
 
@@ -23,22 +20,11 @@ public class VkMirrorLongPoll extends UserLongPoll {
 
     @Override
     public void newMessage(Message message) {
-        logger.info("New message from {} -> {}", message.getFrom(), message.getText());
+        logger.info("New message from {} -> id={} \"{}\"", message.getFrom(), message.getMessageId(),
+                message.getText());
 
-        vkMirror.getTelegramChat(message.getPeerId()).thenApply(s -> {
-            System.out.println("Found chat " + s);
-            if(s == null) {
-                try {
-                    System.out.println("Creating new chat");
-                    return vkMirror.createTelegramChat(message.getPeerId(), vkMirror.getChannelTitle(message.getFrom())).get();
-                } catch (InterruptedException | ExecutionException e) {
-                    e.printStackTrace();
-                }
-            }
-            return s;
-        }).thenAccept(s -> {
-            logger.info("SEEEEEEEEENDDDDDDDDDIIIIIINNNNNNNNNNGGGGGGGG");
-            vkMirror.sendMessage(((TdApi.ChatTypeSupergroup) s.type).supergroupId, message);
+        vkMirror.getTelegramChat(message.getPeerId()).thenAccept(chat -> {
+            vkMirror.sendMessage(chat, message);
         }).exceptionally(e -> {
             logger.error("Can't process new message", e);
             return null;

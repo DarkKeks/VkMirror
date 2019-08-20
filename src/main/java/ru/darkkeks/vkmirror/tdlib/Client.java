@@ -6,10 +6,15 @@
 //
 package ru.darkkeks.vkmirror.tdlib;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ru.darkkeks.vkmirror.NativeUtils;
 
 import java.io.IOException;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -19,6 +24,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Main class for interaction with the TDLib.
  */
 public final class Client implements Runnable {
+
+    private static final Logger logger = LoggerFactory.getLogger(Client.class);
 
     static {
         try {
@@ -54,51 +61,25 @@ public final class Client implements Runnable {
         void onException(Throwable e);
     }
 
-    /**
-     * Sends a request to the TDLib.
-     *
-     * @param query            Object representing a query to the TDLib.
-     * @param resultHandler    Result handler with onResult method which will be called with result
-     *                         of the query or with TdApi.Error as parameter. If it is null, nothing
-     *                         will be called.
-     * @param exceptionHandler Exception handler with onException method which will be called on
-     *                         exception thrown from resultHandler. If it is null, then
-     *                         defaultExceptionHandler will be called.
-     * @throws NullPointerException if query is null.
-     */
-    public void send(TdApi.Function query, ResultHandler resultHandler, ExceptionHandler exceptionHandler) {
-        if (query == null) {
-            throw new NullPointerException("query is null");
-        }
+    public CompletableFuture<TdApi.Object> send(TdApi.Function query) {
+        Objects.requireNonNull(query, "query is null");
 
+        CompletableFuture<TdApi.Object> future = new CompletableFuture<>();
         readLock.lock();
         try {
             if (isClientDestroyed) {
-                if (resultHandler != null) {
-                    handleResult(new TdApi.Error(500, "Client is closed"), resultHandler, exceptionHandler);
-                }
-                return;
+                future.complete(new TdApi.Error(500, "Client is closed"));
+            } else {
+                long queryId = currentQueryId.incrementAndGet();
+                handlers.put(queryId, future);
+                logger.info("NativeClientSend({}, {}, {})", nativeClientId, queryId, query);
+                nativeClientSend(nativeClientId, queryId, query);
             }
-
-            long queryId = currentQueryId.incrementAndGet();
-            handlers.put(queryId, new Handler(resultHandler, exceptionHandler));
-            nativeClientSend(nativeClientId, queryId, query);
         } finally {
             readLock.unlock();
         }
-    }
 
-    /**
-     * Sends a request to the TDLib with an empty ExceptionHandler.
-     *
-     * @param query         Object representing a query to the TDLib.
-     * @param resultHandler Result handler with onResult method which will be called with result
-     *                      of the query or with TdApi.Error as parameter. If it is null, then
-     *                      defaultExceptionHandler will be called.
-     * @throws NullPointerException if query is null.
-     */
-    public void send(TdApi.Function query, ResultHandler resultHandler) {
-        send(query, resultHandler, null);
+        return future;
     }
 
     /**
@@ -116,37 +97,6 @@ public final class Client implements Runnable {
     }
 
     /**
-     * Replaces handler for incoming updates from the TDLib.
-     *
-     * @param updatesHandler   Handler with onResult method which will be called for every incoming
-     *                         update from the TDLib.
-     * @param exceptionHandler Exception handler with onException method which will be called on
-     *                         exception thrown from updatesHandler, if it is null, defaultExceptionHandler will be invoked.
-     */
-    public void setUpdatesHandler(ResultHandler updatesHandler, ExceptionHandler exceptionHandler) {
-        handlers.put(0L, new Handler(updatesHandler, exceptionHandler));
-    }
-
-    /**
-     * Replaces handler for incoming updates from the TDLib. Sets empty ExceptionHandler.
-     *
-     * @param updatesHandler Handler with onResult method which will be called for every incoming
-     *                       update from the TDLib.
-     */
-    public void setUpdatesHandler(ResultHandler updatesHandler) {
-        setUpdatesHandler(updatesHandler, null);
-    }
-
-    /**
-     * Replaces default exception handler to be invoked on exceptions thrown from updatesHandler and all other ResultHandler.
-     *
-     * @param defaultExceptionHandler Default exception handler. If null Exceptions are ignored.
-     */
-    public void setDefaultExceptionHandler(ExceptionHandler defaultExceptionHandler) {
-        this.defaultExceptionHandler = defaultExceptionHandler;
-    }
-
-    /**
      * Overridden method from Runnable, do not call it directly.
      */
     @Override
@@ -161,11 +111,10 @@ public final class Client implements Runnable {
      *
      * @param updatesHandler          Handler for incoming updates.
      * @param updatesExceptionHandler Handler for exceptions thrown from updatesHandler. If it is null, exceptions will be iggnored.
-     * @param defaultExceptionHandler Default handler for exceptions thrown from all ResultHandler. If it is null, exceptions will be iggnored.
      * @return created Client
      */
-    public static Client create(ResultHandler updatesHandler, ExceptionHandler updatesExceptionHandler, ExceptionHandler defaultExceptionHandler) {
-        Client client = new Client(updatesHandler, updatesExceptionHandler, defaultExceptionHandler);
+    public static Client create(ResultHandler updatesHandler, ExceptionHandler updatesExceptionHandler) {
+        Client client = new Client(updatesHandler, updatesExceptionHandler);
         new Thread(client, "TDLib thread").start();
         return client;
     }
@@ -180,7 +129,7 @@ public final class Client implements Runnable {
                 return;
             }
             if (!stopFlag) {
-                send(new TdApi.Close(), null);
+                send(new TdApi.Close());
             }
             isClientDestroyed = true;
             while (!stopFlag) {
@@ -195,37 +144,42 @@ public final class Client implements Runnable {
         }
     }
 
-    private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
-    private final Lock readLock = readWriteLock.readLock();
-    private final Lock writeLock = readWriteLock.writeLock();
+    private static final int MAX_EVENTS = 1000;
 
-    private volatile boolean stopFlag = false;
-    private volatile boolean isClientDestroyed = false;
+    private final Lock readLock;
+    private final Lock writeLock;
+
+    private volatile boolean stopFlag;
+    private volatile boolean isClientDestroyed;
     private final long nativeClientId;
 
-    private final ConcurrentHashMap<Long, Handler> handlers = new ConcurrentHashMap<Long, Handler>();
-    private final AtomicLong currentQueryId = new AtomicLong();
+    private final ConcurrentHashMap<Long, CompletableFuture<TdApi.Object>> handlers;
+    private final AtomicLong currentQueryId;
 
-    private volatile ExceptionHandler defaultExceptionHandler = null;
+    private volatile ResultHandler resultHandler;
+    private volatile ExceptionHandler exceptionHandler;
 
-    private static final int MAX_EVENTS = 1000;
-    private final long[] eventIds = new long[MAX_EVENTS];
-    private final TdApi.Object[] events = new TdApi.Object[MAX_EVENTS];
+    private final long[] eventIds;
+    private final TdApi.Object[] events;
 
-    private static class Handler {
-        final ResultHandler resultHandler;
-        final ExceptionHandler exceptionHandler;
 
-        Handler(ResultHandler resultHandler, ExceptionHandler exceptionHandler) {
-            this.resultHandler = resultHandler;
-            this.exceptionHandler = exceptionHandler;
-        }
-    }
+    private Client(ResultHandler updatesHandler, ExceptionHandler updateExceptionHandler) {
+        resultHandler = updatesHandler;
+        exceptionHandler = updateExceptionHandler;
 
-    private Client(ResultHandler updatesHandler, ExceptionHandler updateExceptionHandler, ExceptionHandler defaultExceptionHandler) {
         nativeClientId = createNativeClient();
-        handlers.put(0L, new Handler(updatesHandler, updateExceptionHandler));
-        this.defaultExceptionHandler = defaultExceptionHandler;
+        handlers = new ConcurrentHashMap<>();
+        currentQueryId = new AtomicLong();
+
+        isClientDestroyed = stopFlag = false;
+
+        events = new TdApi.Object[MAX_EVENTS];
+        eventIds = new long[MAX_EVENTS];
+
+        ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+        writeLock = readWriteLock.writeLock();
+        readLock = readWriteLock.readLock();
+
     }
 
     @Override
@@ -243,37 +197,23 @@ public final class Client implements Runnable {
                 stopFlag = true;
             }
         }
-        Handler handler;
+
         if (id == 0) {
             // update handler stays forever
-            handler = handlers.get(id);
-        } else {
-            handler = handlers.remove(id);
-        }
-        if (handler == null) {
-            return;
-        }
-
-        handleResult(object, handler.resultHandler, handler.exceptionHandler);
-    }
-
-    private void handleResult(TdApi.Object object, ResultHandler resultHandler, ExceptionHandler exceptionHandler) {
-        if (resultHandler == null) {
-            return;
-        }
-
-        try {
-            resultHandler.onResult(object);
-        } catch (Throwable cause) {
-            if (exceptionHandler == null) {
-                exceptionHandler = defaultExceptionHandler;
-            }
-            if (exceptionHandler != null) {
-                try {
-                    exceptionHandler.onException(cause);
-                } catch (Throwable ignored) {
+            try {
+                resultHandler.onResult(object);
+            } catch (Throwable cause) {
+                if (exceptionHandler != null) {
+                    try {
+                        exceptionHandler.onException(cause);
+                    } catch (Throwable ignored) {
+                    }
                 }
             }
+        } else if(handlers.containsKey(id)) {
+            ForkJoinPool.commonPool().submit(() -> {
+                handlers.get(id).complete(object);
+            });
         }
     }
 

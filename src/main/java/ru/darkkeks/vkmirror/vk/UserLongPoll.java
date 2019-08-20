@@ -55,11 +55,7 @@ public class UserLongPoll {
 
         int id = updateArray.get(0).getAsInt();
 
-        System.out.println(update);
-
         switch (id) {
-            case 1:
-
             case 4:
                 newMessage(client.getGson().fromJson(update, Message.class));
                 break;

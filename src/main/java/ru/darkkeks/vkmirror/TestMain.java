@@ -5,9 +5,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.darkkeks.vkmirror.autoreg.BotDao;
 
-public class Main {
+public class TestMain {
 
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+    private static final Logger logger = LoggerFactory.getLogger(TestMain.class);
 
     public static void main(String[] args) {
 //        new VkMirror();

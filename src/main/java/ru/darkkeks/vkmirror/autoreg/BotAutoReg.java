@@ -17,6 +17,7 @@ public class BotAutoReg {
 
     private static final Logger logger = LoggerFactory.getLogger(BotAutoReg.class);
 
+    public static final Pattern INVALID_BOT_SELECTED = Pattern.compile("Invalid bot selected");
     private static final Pattern timeoutPattern = Pattern.compile("Please try again in (\\d+) seconds.");
 
     private static final String MY_BOTS = "/mybots";
@@ -113,6 +114,18 @@ public class BotAutoReg {
      */
     public CompletableFuture<Void> setDescription(String username, String description) {
         SetDescriptionAction action = new SetDescriptionAction(this, username, description);
+        actions.offer(action);
+        return action.getCompletableFuture();
+    }
+
+
+    /**
+     * Sets bot name
+     * @param username Bot username (with @)
+     * @param name New bot name
+     */
+    public CompletableFuture<Void> setName(String username, String name) {
+        SetNameAction action = new SetNameAction(this, username, name);
         actions.offer(action);
         return action.getCompletableFuture();
     }

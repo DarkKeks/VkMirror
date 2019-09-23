@@ -1,22 +1,23 @@
 package ru.darkkeks.vkmirror.autoreg;
 
-public class SetDescriptionAction extends BotFatherAction<Void> {
+// TODO Extract common class with SetDescription ?
+//  May be should look into this after implementing bot avatar
+public class SetNameAction extends BotFatherAction<Void> {
 
-    private static final String SET_DESCRIPTION = "/setdescription";
+    private static final String SET_NAME = "/setname";
 
     private String username;
-    private String description;
+    private String name;
 
-    public SetDescriptionAction(BotAutoReg autoReg, String username, String description) {
+    public SetNameAction(BotAutoReg autoReg, String username, String name) {
         super(autoReg);
-
         this.username = username;
-        this.description = description;
+        this.name = name;
     }
 
     @Override
     public void execute() {
-        String newBot = getAutoReg().executeCommand(SET_DESCRIPTION);
+        String newBot = getAutoReg().executeCommand(SET_NAME);
 
         int timeout = getAutoReg().getTimeoutSeconds(newBot);
         if (timeout != BotAutoReg.NO_TIMEOUT) {
@@ -30,7 +31,7 @@ public class SetDescriptionAction extends BotFatherAction<Void> {
             getCompletableFuture().completeExceptionally(new IllegalStateException("Invalid username"));
         }
 
-        String result = getAutoReg().executeCommand(description);
+        String result = getAutoReg().executeCommand(name);
 
         finish(null);
     }

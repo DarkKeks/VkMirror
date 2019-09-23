@@ -4,13 +4,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-public class BotManager {
+public class BotDataManager {
 
     private BotDao botDao;
 
     private Map<Integer, VkMirrorBot> bots;
 
-    public BotManager(BotDao botDao) {
+    public BotDataManager(BotDao botDao) {
         this.botDao = botDao;
         this.bots = new HashMap<>();
     }

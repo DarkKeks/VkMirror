@@ -5,9 +5,10 @@ build
 .gradle
 logs
 
-/tdlib
-/tdlibbot
+/tdlib*
 tdlib.log
+
+accounts
 
 /src/main/jni/bin
 /src/main/jni/td

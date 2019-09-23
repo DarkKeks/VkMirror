@@ -118,4 +118,6 @@ public class VkMirrorDao {
             logger.error("Can't save chat", e);
         }
     }
+
+
 }

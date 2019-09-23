@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 public class VkMirror {
 
@@ -37,10 +36,10 @@ public class VkMirror {
         vkController = new VkController(Config.USER_ID, Config.USER_TOKEN);
 
         logger.info("Creating telegram");
-        telegram = new VkMirrorTelegram(Config.API_ID, Config.API_HASH, false);
+        telegram = new VkMirrorTelegram(Config.API_ID, Config.API_HASH, false, Config.PHONE_NUMBER);
 
         logger.info("Creating bot");
-        bot = new VkMirrorTelegram(Config.API_ID, Config.API_HASH, true);
+        bot = new VkMirrorTelegram(Config.API_ID, Config.API_HASH, true, Config.BOT_TOKEN);
 
         telegram.onMessage(msg -> {
             if(msg.message.senderUserId == telegram.getMyId()) {

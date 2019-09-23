@@ -29,7 +29,7 @@ public class VkMirrorTelegram {
 
     private boolean isBot;
 
-    public VkMirrorTelegram(int apiId, String apiHash, boolean isBot) {
+    public VkMirrorTelegram(int apiId, String apiHash, boolean isBot, String login) {
         updateHandlers = new HashMap<>();
         supergroups = new ConcurrentHashMap<>();
         orderedChats = new TreeSet<>();
@@ -43,9 +43,9 @@ public class VkMirrorTelegram {
 
         AuthHandler authHandler;
         if(isBot) {
-            authHandler = AuthHandler.bot(this, apiId, apiHash, Config.BOT_TOKEN);
+            authHandler = AuthHandler.bot(this, apiId, apiHash, login);
         } else {
-            authHandler = AuthHandler.phone(this, apiId, apiHash, Config.PHONE_NUMBER);
+            authHandler = AuthHandler.phone(this, apiId, apiHash, login);
         }
         addHandler(TdApi.UpdateAuthorizationState.class, authHandler);
 
@@ -137,6 +137,20 @@ public class VkMirrorTelegram {
             }
             return (TdApi.Chat) result;
         });
+    }
+
+    public CompletableFuture<TdApi.Chat> createPrivateChat(int usedId) {
+        return client.send(new TdApi.CreatePrivateChat(usedId, false)).thenApply(result -> {
+            if(result instanceof TdApi.Error) {
+                logger.error("Error creating user chat {}: {} ", usedId, result);
+                throw new IllegalStateException();
+            }
+            return (TdApi.Chat) result;
+        });
+    }
+
+    public CompletableFuture<TdApi.Chat> searchPublicUsername(String username) {
+        return client.send(new TdApi.SearchPublicChat(username)).thenApply(result -> (TdApi.Chat) result);
     }
 
     public CompletableFuture<TdApi.Message> sendMessage(long chatId, String text) {

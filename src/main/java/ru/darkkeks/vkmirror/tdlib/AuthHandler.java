@@ -63,7 +63,7 @@ public class AuthHandler implements Consumer<TdApi.UpdateAuthorizationState> {
             }
             case TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR: {
                 if(phoneNumber != null) {
-                    telegram.getClient().send(new TdApi.SetAuthenticationPhoneNumber(Config.PHONE_NUMBER, false, false));
+                    telegram.getClient().send(new TdApi.SetAuthenticationPhoneNumber(phoneNumber, false, false));
                 } else {
                     telegram.getClient().send(new TdApi.CheckAuthenticationBotToken(botToken));
                 }
@@ -115,7 +115,7 @@ public class AuthHandler implements Consumer<TdApi.UpdateAuthorizationState> {
 
     private void sendParameters() {
         TdApi.TdlibParameters parameters = new TdApi.TdlibParameters();
-        parameters.databaseDirectory = phoneNumber != null ? "tdlib" : "tdlibbot";
+        parameters.databaseDirectory = phoneNumber != null ? "tdlib" + phoneNumber : "tdlib" + botToken;
         parameters.enableStorageOptimizer = true;
         parameters.useMessageDatabase = true;
         parameters.useSecretChats = true;

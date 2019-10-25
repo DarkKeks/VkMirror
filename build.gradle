@@ -30,7 +30,9 @@ dependencies {
 
 tasks.withType(JavaExec) {
     file('local.env').readLines().each() {
-        def (key, value) = it.split('=', 2)
-        environment key, value
+        if(it.contains("=")) {
+            def (key, value) = it.split('=', 2)
+            environment key, value
+        }
     }
 }

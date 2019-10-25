@@ -23,9 +23,7 @@ public class VkMirrorLongPoll extends UserLongPoll {
         logger.info("New message from {} -> id={} \"{}\"", message.getFrom(), message.getMessageId(),
                 message.getText());
 
-        vkMirror.getTelegramChat(message.getPeerId()).thenAccept(chat -> {
-            vkMirror.sendMessage(chat, message);
-        }).exceptionally(e -> {
+        vkMirror.sendMessage(message).exceptionally(e -> {
             logger.error("Can't process new message", e);
             return null;
         });

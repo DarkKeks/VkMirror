@@ -1,18 +1,20 @@
 package ru.darkkeks.vkmirror.vk;
 
 import com.google.gson.GsonBuilder;
-import com.vk.api.sdk.client.Utils;
 import com.vk.api.sdk.client.VkApiClient;
 import com.vk.api.sdk.client.actors.UserActor;
 import com.vk.api.sdk.exceptions.ApiException;
 import com.vk.api.sdk.exceptions.ClientException;
 import com.vk.api.sdk.httpclient.HttpTransportClient;
 import com.vk.api.sdk.objects.groups.Group;
+import com.vk.api.sdk.objects.groups.GroupFull;
+import com.vk.api.sdk.objects.messages.responses.GetChatPreviewResponse;
 import com.vk.api.sdk.objects.users.Fields;
 import com.vk.api.sdk.objects.users.User;
 import com.vk.api.sdk.objects.users.UserXtrCounters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ru.darkkeks.vkmirror.VkMirror;
 import ru.darkkeks.vkmirror.tdlib.TdApi;
 import ru.darkkeks.vkmirror.vk.object.ChatSettings;
 import ru.darkkeks.vkmirror.vk.object.Message;
@@ -141,12 +143,23 @@ public class VkController {
         return null;
     }
 
+    /**
+     * Multichat is a chat with multiple people (or group bots)
+     * @return true if chat with that id is a multichat, false otherwise
+     */
     public boolean isMultichat(int id) {
         return id >= MULTICHAT_BASE;
     }
 
+    /**
+     * @return true if chat with that id is a private chat with group
+     */
     public boolean isGroup(int id) {
         return id < 0;
+    }
+
+    public boolean isPrivateChat(int id) {
+        return !isMultichat(id) && !isGroup(id);
     }
 
     public UserActor getActor() {
@@ -159,6 +172,32 @@ public class VkController {
 
     public Integer getMyId() {
         return myId;
+    }
+
+    public String getChannelTitle(int peerId) {
+        try {
+            if (isMultichat(peerId)) {
+                GetChatPreviewResponse chat =
+                        getClient().messages().getChatPreview(getActor())
+                                .peerId(peerId)
+                                .execute();
+                return chat.getPreview().getTitle();
+            } else if (isGroup(peerId)) {
+                GroupFull group = getClient().groups().getById(getActor())
+                        .groupId(Integer.toString(-peerId))
+                        .execute().get(0);
+                return group.getName();
+            } else {
+                UserXtrCounters user = getClient().users().get(getActor())
+                        .userIds(Integer.toString(peerId))
+                        .execute().get(0);
+
+                return String.format("%s %s", user.getFirstName(), user.getLastName());
+            }
+        } catch (ClientException | ApiException e) {
+            logger.error("Cant get channel title {}: ", peerId, e);
+            return null;
+        }
     }
 
     private static class MessageProcessor<T extends TdApi.MessageContent> {
@@ -180,7 +219,6 @@ public class VkController {
             return Collections.emptyList();
         }
     }
-
     private interface MessageHandler<T extends TdApi.MessageContent> {
         List<Integer> accept(Integer vkPeerId, TdApi.Message message, T content) throws Exception;
     }

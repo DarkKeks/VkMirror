@@ -129,6 +129,7 @@ public final class Client implements Runnable {
                 return;
             }
             if (!stopFlag) {
+
                 send(new TdApi.Close());
             }
             isClientDestroyed = true;

@@ -26,13 +26,17 @@ public class BotDataManager {
                     bot = bindFree(id);
                 }
 
+                if(bot != null) {
+                    bots.put(id, bot);
+                }
+
                 return bot;
             });
         }
     }
 
 
-    // TODO Ask user, if he wants to use one free bot on this vk account
+    // TODO Ask user if he wants to use one free bot on this vk account
     private VkMirrorBot bindFree(int id) {
         return null;
     }

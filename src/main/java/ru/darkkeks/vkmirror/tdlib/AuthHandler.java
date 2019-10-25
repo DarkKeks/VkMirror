@@ -46,6 +46,10 @@ public class AuthHandler implements Consumer<TdApi.UpdateAuthorizationState> {
         return result;
     }
 
+    private boolean isBot() {
+        return phoneNumber == null;
+    }
+
     @Override
     public void accept(TdApi.UpdateAuthorizationState updateAuthorizationState) {
         TdApi.AuthorizationState authState = updateAuthorizationState.authorizationState;
@@ -115,7 +119,7 @@ public class AuthHandler implements Consumer<TdApi.UpdateAuthorizationState> {
 
     private void sendParameters() {
         TdApi.TdlibParameters parameters = new TdApi.TdlibParameters();
-        parameters.databaseDirectory = phoneNumber != null ? "tdlib" + phoneNumber : "tdlib" + botToken;
+        parameters.databaseDirectory = phoneNumber != null ? "tdlib" + phoneNumber : "tdlib-" + botToken;
         parameters.enableStorageOptimizer = true;
         parameters.useMessageDatabase = true;
         parameters.useSecretChats = true;

@@ -3,12 +3,14 @@ package ru.darkkeks.vkmirror;
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ru.darkkeks.vkmirror.vk.ChatType;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+// TODO Reflect changes in VkMirrorChat
 public class VkMirrorDao {
 
     private static final Logger logger = LoggerFactory.getLogger(VkMirrorDao.class);
@@ -39,7 +41,8 @@ public class VkMirrorDao {
                 return new VkMirrorChat(
                         result.getInt("id"),
                         result.getInt("vkPeerId"),
-                        result.getInt("telegramGroupId"));
+                        result.getInt("telegramGroupId"),
+                        ChatType.values()[result.getInt("chatType")]);
             }
         } catch (SQLException e) {
             logger.error("Can't load chat", e);
@@ -61,12 +64,12 @@ public class VkMirrorDao {
 
     public void save(VkMirrorChat chat) {
         logger.info("Saving chat VkMirrorChat(vkPeerId={}, telegramChatId={})", chat.getVkPeerId(),
-                chat.getTelegramChannelId());
+                chat.getTelegramId());
 
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement(INSERT)) {
             statement.setInt(1, chat.getVkPeerId());
-            statement.setInt(2, chat.getTelegramChannelId());
+            statement.setInt(2, chat.getTelegramId());
             ResultSet resultSet = statement.executeQuery();
             if(resultSet.next()) {
                 chat.setId(resultSet.getInt("id"));
@@ -104,7 +107,7 @@ public class VkMirrorDao {
         logger.info("Saving message from chat VkMirrorChat(vkPeerId={}, telegramChatId={}) -> " +
                         "vkMessageId = {}, telegramMessageId = {}",
                 chat.getVkPeerId(),
-                chat.getTelegramChannelId(),
+                chat.getTelegramId(),
                 vkMessageId,
                 telegramMessageId);
 

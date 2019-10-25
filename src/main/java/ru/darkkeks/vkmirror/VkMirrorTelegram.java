@@ -38,8 +38,8 @@ public class VkMirrorTelegram {
 
         this.isBot = isBot;
 
-        Client.execute(new TdApi.SetLogVerbosityLevel(0));
-//        Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27)));
+        Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27)));
+        Client.execute(new TdApi.SetLogVerbosityLevel(5));
 
         AuthHandler authHandler;
         if(isBot) {
@@ -139,10 +139,10 @@ public class VkMirrorTelegram {
         });
     }
 
-    public CompletableFuture<TdApi.Chat> createPrivateChat(int usedId) {
-        return client.send(new TdApi.CreatePrivateChat(usedId, false)).thenApply(result -> {
+    public CompletableFuture<TdApi.Chat> createPrivateChat(int userId) {
+        return client.send(new TdApi.CreatePrivateChat(userId, false)).thenApply(result -> {
             if(result instanceof TdApi.Error) {
-                logger.error("Error creating user chat {}: {} ", usedId, result);
+                logger.error("Error creating user chat {}: {} ", userId, result);
                 throw new IllegalStateException();
             }
             return (TdApi.Chat) result;
@@ -166,6 +166,10 @@ public class VkMirrorTelegram {
             }
             return (TdApi.Chat) result;
         });
+    }
+
+    public CompletableFuture<TdApi.Ok> deleteMessage(long chatId, boolean revoke, long ...messageIds) {
+        return client.send(new TdApi.DeleteMessages(chatId, messageIds, revoke)).thenApply(ok -> (TdApi.Ok)ok);
     }
 
     private static class UpdateHandlerHolder<T extends TdApi.Update> {

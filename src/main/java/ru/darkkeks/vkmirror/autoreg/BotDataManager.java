@@ -1,5 +1,6 @@
 package ru.darkkeks.vkmirror.autoreg;
 
+import javax.inject.Inject;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -10,6 +11,7 @@ public class BotDataManager {
 
     private Map<Integer, VkMirrorBot> bots;
 
+    @Inject
     public BotDataManager(BotDao botDao) {
         this.botDao = botDao;
         this.bots = new HashMap<>();

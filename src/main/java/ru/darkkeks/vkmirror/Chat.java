@@ -1,8 +1,9 @@
 package ru.darkkeks.vkmirror;
 
+
 import ru.darkkeks.vkmirror.vk.ChatType;
 
-public class VkMirrorChat {
+public class Chat {
 
     private int id;
     private int vkPeerId;
@@ -10,19 +11,19 @@ public class VkMirrorChat {
 
     private ChatType type;
 
-    public VkMirrorChat(int id, int vkPeerId, int telegramId, ChatType type) {
+    public Chat(int id, int vkPeerId, int telegramId, ChatType type) {
         this.id = id;
         this.vkPeerId = vkPeerId;
         this.telegramId = telegramId;
         this.type = type;
     }
 
-    public static VkMirrorChat privateChat(int vkPeerId, int botId) {
-        return new VkMirrorChat(-1, vkPeerId, botId, ChatType.PRIVATE);
+    public static Chat privateChat(int vkPeerId, int botId) {
+        return new Chat(-1, vkPeerId, botId, ChatType.PRIVATE);
     }
 
-    public static VkMirrorChat groupChat(int vkPeerId, int telegramChatId) {
-        return new VkMirrorChat(-1, vkPeerId, telegramChatId, ChatType.GROUP);
+    public static Chat groupChat(int vkPeerId, int telegramChatId) {
+        return new Chat(-1, vkPeerId, telegramChatId, ChatType.GROUP);
     }
 
     public void setId(int id) {

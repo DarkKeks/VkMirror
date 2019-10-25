@@ -8,7 +8,7 @@ package ru.darkkeks.vkmirror.tdlib;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.darkkeks.vkmirror.NativeUtils;
+import ru.darkkeks.vkmirror.util.NativeUtils;
 
 import java.io.IOException;
 import java.util.Objects;

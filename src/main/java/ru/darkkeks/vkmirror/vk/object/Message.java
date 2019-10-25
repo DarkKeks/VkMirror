@@ -11,7 +11,7 @@ public class Message {
     private int peerId;
     private int timestamp;
     private String text;
-    private JsonObject attachements;
+    private JsonObject attachments;
 
     private String title;
     private int from;
@@ -36,8 +36,8 @@ public class Message {
         return text;
     }
 
-    public JsonObject getAttachements() {
-        return attachements;
+    public JsonObject getAttachments() {
+        return attachments;
     }
 
     public String getTitle() {
@@ -73,7 +73,7 @@ public class Message {
                 }
             }
             if(array.size() > 7) {
-                result.attachements = array.get(7).getAsJsonObject();
+                result.attachments = array.get(7).getAsJsonObject();
             }
             if(result.from == 0) {
                 result.from = result.peerId;

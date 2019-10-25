@@ -9,13 +9,15 @@ version '1.0-SNAPSHOT'
 
 mainClassName = 'ru.darkkeks.vkmirror.Main'
 
-sourceCompatibility = 1.8
+sourceCompatibility = 1.11
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
+    implementation 'com.google.inject:guice:4.2.2'
+
     implementation 'com.vk.api:sdk:1.0.2'
 
     implementation "org.telegram:telegrambots:4.3.1"

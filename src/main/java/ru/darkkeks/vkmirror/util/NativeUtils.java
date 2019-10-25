@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package ru.darkkeks.vkmirror;
+package ru.darkkeks.vkmirror.util;
 
 import java.io.*;
 import java.nio.file.FileSystemNotFoundException;

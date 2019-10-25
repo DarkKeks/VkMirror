@@ -1,9 +1,11 @@
 package ru.darkkeks.vkmirror.autoreg;
 
-import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -11,6 +13,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+@Singleton
 public class BotDao {
 
     private static final Logger logger = LoggerFactory.getLogger(BotDao.class);
@@ -18,9 +21,10 @@ public class BotDao {
     private static final String INSERT_BOT = "INSERT INTO bots(username, token, vk_id) VALUES (?, ?, ?) RETURNING id";
     private static final String SELECT_BOT = "SELECT * FROM bots WHERE vk_id = ?";
 
-    private HikariDataSource dataSource;
+    private DataSource dataSource;
 
-    public BotDao(HikariDataSource dataSource) {
+    @Inject
+    public BotDao(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 

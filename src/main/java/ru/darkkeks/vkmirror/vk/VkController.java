@@ -1,11 +1,9 @@
 package ru.darkkeks.vkmirror.vk;
 
-import com.google.gson.GsonBuilder;
 import com.vk.api.sdk.client.VkApiClient;
 import com.vk.api.sdk.client.actors.UserActor;
 import com.vk.api.sdk.exceptions.ApiException;
 import com.vk.api.sdk.exceptions.ClientException;
-import com.vk.api.sdk.httpclient.HttpTransportClient;
 import com.vk.api.sdk.objects.groups.Group;
 import com.vk.api.sdk.objects.groups.GroupFull;
 import com.vk.api.sdk.objects.messages.responses.GetChatPreviewResponse;
@@ -14,12 +12,11 @@ import com.vk.api.sdk.objects.users.User;
 import com.vk.api.sdk.objects.users.UserXtrCounters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.darkkeks.vkmirror.VkMirror;
 import ru.darkkeks.vkmirror.tdlib.TdApi;
 import ru.darkkeks.vkmirror.vk.object.ChatSettings;
-import ru.darkkeks.vkmirror.vk.object.Message;
 import ru.darkkeks.vkmirror.vk.object.MyConversation;
 
+import javax.inject.Inject;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
@@ -27,7 +24,11 @@ import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class VkController {
 
@@ -42,12 +43,10 @@ public class VkController {
 
     private Map<Class<?>, MessageProcessor<?>> handlers;
 
-    public VkController(int userId, String userToken) {
-        GsonBuilder builder = new GsonBuilder();
-        builder.registerTypeAdapter(Message.class, new Message.MessageDeserializer());
-
-        client = new VkApiClient(new HttpTransportClient(), builder.create(), 3);
-        actor = new UserActor(userId, userToken);
+    @Inject
+    public VkController(VkApiClient client, UserActor actor) {
+        this.client = client;
+        this.actor = actor;
 
         try {
             myId = client.users().get(actor).execute().get(0).getId();
@@ -57,13 +56,11 @@ public class VkController {
 
         handlers = new HashMap<>();
 
-        Random random = new Random();
-
         addHandler(TdApi.MessageText.class, (id, message, content) -> Collections.singletonList(
                 client.messages().send(actor)
                         .peerId(id)
                         .message(content.text.text)
-                        .randomId(random.nextInt())
+                        .randomId(ThreadLocalRandom.current().nextInt())
                         .execute()));
     }
 

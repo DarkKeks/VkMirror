@@ -16,10 +16,12 @@ public class UserLongPoll {
 
     private VkApiClient client;
     private UserActor actor;
+    private LongPollListener listener;
 
-    public UserLongPoll(VkApiClient client, UserActor actor) {
+    public UserLongPoll(VkApiClient client, UserActor actor, LongPollListener listener) {
         this.client = client;
         this.actor = actor;
+        this.listener = listener;
     }
 
     public void run() throws ClientException, ApiException {
@@ -55,15 +57,13 @@ public class UserLongPoll {
 
         int id = updateArray.get(0).getAsInt();
 
+        //noinspection SwitchStatementWithTooFewBranches
         switch (id) {
             case 4:
-                newMessage(client.getGson().fromJson(update, Message.class));
+                listener.newMessage(client.getGson().fromJson(update, Message.class));
                 break;
 
         }
-    }
-
-    public void newMessage(Message message) {
     }
 
 }

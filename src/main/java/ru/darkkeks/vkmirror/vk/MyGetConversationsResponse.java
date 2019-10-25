@@ -69,11 +69,9 @@ public class MyGetConversationsResponse {
     }
 
     public String toPrettyString() {
-        final StringBuilder sb = new StringBuilder("GetConversationsByIdExtendedResponse{");
-        sb.append("count=").append(count);
-        sb.append(", profiles=").append(profiles);
-        sb.append(", items=").append(items);
-        sb.append('}');
-        return sb.toString();
+        return "GetConversationsByIdExtendedResponse{" + "count=" + count +
+                ", profiles=" + profiles +
+                ", items=" + items +
+                '}';
     }
 }

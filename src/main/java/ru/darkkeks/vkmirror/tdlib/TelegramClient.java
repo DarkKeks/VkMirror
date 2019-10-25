@@ -1,11 +1,7 @@
-package ru.darkkeks.vkmirror;
+package ru.darkkeks.vkmirror.tdlib;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.darkkeks.vkmirror.tdlib.AuthHandler;
-import ru.darkkeks.vkmirror.tdlib.Client;
-import ru.darkkeks.vkmirror.tdlib.OrderedChat;
-import ru.darkkeks.vkmirror.tdlib.TdApi;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -13,40 +9,33 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-public class VkMirrorTelegram {
+public class TelegramClient {
 
-    private static final Logger logger = LoggerFactory.getLogger(VkMirrorTelegram.class);
+    private static final Logger logger = LoggerFactory.getLogger(TelegramClient.class);
+    private final AuthHandler authHandler;
 
     private Client client;
-
-    private Map<Class<?>, List<UpdateHandlerHolder<?>>> updateHandlers;
 
     private Map<String, Integer> options;
 
     private Map<Long, TdApi.Chat> chats;
-    private NavigableSet<OrderedChat> orderedChats;
     private Map<Integer, TdApi.Supergroup> supergroups;
 
-    private boolean isBot;
+    private NavigableSet<OrderedChat> orderedChats;
 
-    public VkMirrorTelegram(int apiId, String apiHash, boolean isBot, String login) {
+    private Map<Class<?>, List<UpdateHandlerHolder<?>>> updateHandlers;
+
+    public TelegramClient(TelegramCredentials credentials) {
         updateHandlers = new HashMap<>();
         supergroups = new ConcurrentHashMap<>();
         orderedChats = new TreeSet<>();
-        chats = new HashMap<>();
         options = new HashMap<>();
-
-        this.isBot = isBot;
+        chats = new HashMap<>();
 
         Client.execute(new TdApi.SetLogStream(new TdApi.LogStreamFile("tdlib.log", 1 << 27)));
         Client.execute(new TdApi.SetLogVerbosityLevel(5));
 
-        AuthHandler authHandler;
-        if(isBot) {
-            authHandler = AuthHandler.bot(this, apiId, apiHash, login);
-        } else {
-            authHandler = AuthHandler.phone(this, apiId, apiHash, login);
-        }
+        authHandler = new AuthHandler(this, credentials);
         addHandler(TdApi.UpdateAuthorizationState.class, authHandler);
 
         addHandler(TdApi.UpdateOption.class, update -> {
@@ -80,7 +69,9 @@ public class VkMirrorTelegram {
         addHandler(TdApi.UpdateChatLastMessage.class, update -> {
             updateChat(chats.get(update.chatId), update.order);
         });
+    }
 
+    public void start() {
         client = Client.create(this::handlerUpdate, this::handleException);
         authHandler.awaitAuthorization();
     }

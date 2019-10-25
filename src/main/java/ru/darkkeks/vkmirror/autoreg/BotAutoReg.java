@@ -1,8 +1,10 @@
 package ru.darkkeks.vkmirror.autoreg;
 
+import com.google.inject.Inject;
+import com.google.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.darkkeks.vkmirror.VkMirrorTelegram;
+import ru.darkkeks.vkmirror.tdlib.TelegramClient;
 import ru.darkkeks.vkmirror.tdlib.TdApi;
 
 import java.util.concurrent.BlockingQueue;
@@ -13,6 +15,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
+@Singleton
 public class BotAutoReg {
 
     private static final Logger logger = LoggerFactory.getLogger(BotAutoReg.class);
@@ -26,7 +29,7 @@ public class BotAutoReg {
     public static final int NO_TIMEOUT = -1;
 
 
-    private VkMirrorTelegram account;
+    private TelegramClient account;
     private ScheduledExecutorService executor;
 
     private BlockingQueue<BotFatherAction<?>> actions;
@@ -34,7 +37,8 @@ public class BotAutoReg {
 
     private TdApi.Chat botFatherChat;
 
-    public BotAutoReg(VkMirrorTelegram account, ScheduledExecutorService executor) {
+    @Inject
+    public BotAutoReg(@AutoRegClient TelegramClient account, ScheduledExecutorService executor) {
         this.account = account;
         this.executor = executor;
 

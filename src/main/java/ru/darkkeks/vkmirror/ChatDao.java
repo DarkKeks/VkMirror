@@ -1,19 +1,22 @@
 package ru.darkkeks.vkmirror;
 
-import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.darkkeks.vkmirror.vk.ChatType;
 
+import javax.inject.Inject;
+import javax.inject.Singleton;
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
 // TODO Reflect changes in VkMirrorChat
-public class VkMirrorDao {
+@Singleton
+public class ChatDao {
 
-    private static final Logger logger = LoggerFactory.getLogger(VkMirrorDao.class);
+    private static final Logger logger = LoggerFactory.getLogger(ChatDao.class);
 
     private static final String SELECT_BY_VK = "SELECT * FROM chats WHERE vkPeerId = ?";
     private static final String SELECT_BY_TELEGRAM = "SELECT * FROM chats WHERE telegramGroupId = ?";
@@ -26,19 +29,20 @@ public class VkMirrorDao {
     private static final String INSERT_MESSAGE = "INSERT INTO messages(chat_id, vkmessageid, telegrammessageid) " +
             "VALUES (?, ?, ?)";
 
-    private HikariDataSource dataSource;
+    private DataSource dataSource;
 
-    public VkMirrorDao(HikariDataSource dataSource) {
+    @Inject
+    public ChatDao(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 
-    private VkMirrorChat getChatBySql(String sql, int id) {
+    private Chat getChatBySql(String sql, int id) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setInt(1, id);
             ResultSet result = statement.executeQuery();
             if (result.next()) {
-                return new VkMirrorChat(
+                return new Chat(
                         result.getInt("id"),
                         result.getInt("vkPeerId"),
                         result.getInt("telegramGroupId"),
@@ -50,19 +54,19 @@ public class VkMirrorDao {
         return null;
     }
 
-    public VkMirrorChat getChatByVkPeer(int vkChatId) {
+    public Chat getChatByVkPeer(int vkChatId) {
         logger.info("Loading chat from peer id {}", vkChatId);
 
         return getChatBySql(SELECT_BY_VK, vkChatId);
     }
 
-    public VkMirrorChat getChatByTelegramGroup(int telegramGroupId) {
+    public Chat getChatByTelegramGroup(int telegramGroupId) {
         logger.info("Loading chat from telegram group id {}", telegramGroupId);
 
         return getChatBySql(SELECT_BY_TELEGRAM, telegramGroupId);
     }
 
-    public void save(VkMirrorChat chat) {
+    public void save(Chat chat) {
         logger.info("Saving chat VkMirrorChat(vkPeerId={}, telegramChatId={})", chat.getVkPeerId(),
                 chat.getTelegramId());
 
@@ -95,15 +99,15 @@ public class VkMirrorDao {
         return false;
     }
 
-    public boolean isSyncedVk(VkMirrorChat chat, int messageId) {
+    public boolean isSyncedVk(Chat chat, int messageId) {
         return isSynced(CHECK_SYNC_VK, chat.getId(), messageId);
     }
 
-    public boolean isSyncedTelegram(VkMirrorChat chat, long messageId) {
+    public boolean isSyncedTelegram(Chat chat, long messageId) {
         return isSynced(CHECK_SYNC_TELEGRAM, chat.getId(), messageId);
     }
 
-    public void saveMessage(VkMirrorChat chat, int vkMessageId, long telegramMessageId) {
+    public void saveMessage(Chat chat, int vkMessageId, long telegramMessageId) {
         logger.info("Saving message from chat VkMirrorChat(vkPeerId={}, telegramChatId={}) -> " +
                         "vkMessageId = {}, telegramMessageId = {}",
                 chat.getVkPeerId(),

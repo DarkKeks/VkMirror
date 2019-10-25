@@ -1,8 +1,5 @@
 package ru.darkkeks.vkmirror.tdlib;
 
-import ru.darkkeks.vkmirror.Config;
-import ru.darkkeks.vkmirror.VkMirrorTelegram;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -17,48 +14,27 @@ public class AuthHandler implements Consumer<TdApi.UpdateAuthorizationState> {
     private Condition authCondition = authLock.newCondition();
     private boolean authorized;
 
-    private VkMirrorTelegram telegram;
-
-    private int apiId;
-    private String apiHash;
-
-    private String phoneNumber;
-    private String botToken;
+    private TelegramClient telegram;
+    private TelegramCredentials credentials;
 
     private TdApi.AuthorizationState state;
 
-    private AuthHandler(VkMirrorTelegram telegram, int apiId, String apiHash) {
+    public AuthHandler(TelegramClient telegram, TelegramCredentials credentials) {
         this.telegram = telegram;
-        this.apiId = apiId;
-        this.apiHash = apiHash;
+        this.credentials = credentials;
         this.authorized = false;
-    }
-
-    public static AuthHandler phone(VkMirrorTelegram telegram, int apiId, String apiHash, String phoneNumber) {
-        AuthHandler result = new AuthHandler(telegram, apiId, apiHash);
-        result.phoneNumber = phoneNumber;
-        return result;
-    }
-
-    public static AuthHandler bot(VkMirrorTelegram telegram, int apiId, String apiHash, String botToken) {
-        AuthHandler result = new AuthHandler(telegram, apiId, apiHash);
-        result.botToken = botToken;
-        return result;
-    }
-
-    private boolean isBot() {
-        return phoneNumber == null;
     }
 
     @Override
     public void accept(TdApi.UpdateAuthorizationState updateAuthorizationState) {
         TdApi.AuthorizationState authState = updateAuthorizationState.authorizationState;
+        assert authState != null; // FIXME
         if(authState != null) {
             state = authState;
         }
         switch (state.getConstructor()) {
             case TdApi.AuthorizationStateWaitTdlibParameters.CONSTRUCTOR: {
-                sendParameters();
+                telegram.getClient().send(createParameters());
                 break;
             }
             case TdApi.AuthorizationStateWaitEncryptionKey.CONSTRUCTOR: {
@@ -66,11 +42,7 @@ public class AuthHandler implements Consumer<TdApi.UpdateAuthorizationState> {
                 break;
             }
             case TdApi.AuthorizationStateWaitPhoneNumber.CONSTRUCTOR: {
-                if(phoneNumber != null) {
-                    telegram.getClient().send(new TdApi.SetAuthenticationPhoneNumber(phoneNumber, false, false));
-                } else {
-                    telegram.getClient().send(new TdApi.CheckAuthenticationBotToken(botToken));
-                }
+                telegram.getClient().send(credentials.getCredentialsFunction());
                 break;
             }
             case TdApi.AuthorizationStateWaitCode.CONSTRUCTOR: {
@@ -117,20 +89,19 @@ public class AuthHandler implements Consumer<TdApi.UpdateAuthorizationState> {
         }
     }
 
-    private void sendParameters() {
+    private TdApi.SetTdlibParameters createParameters() {
         TdApi.TdlibParameters parameters = new TdApi.TdlibParameters();
-        parameters.databaseDirectory = phoneNumber != null ? "tdlib" + phoneNumber : "tdlib-" + botToken;
+        parameters.databaseDirectory = credentials.getDataDirectory();
         parameters.enableStorageOptimizer = true;
         parameters.useMessageDatabase = true;
         parameters.useSecretChats = true;
-        parameters.apiId = apiId;
-        parameters.apiHash = apiHash;
+        parameters.apiId = credentials.getApiId();
+        parameters.apiHash = credentials.getApiHash();
         parameters.systemLanguageCode = "en";
         parameters.deviceModel = "Desktop";
         parameters.systemVersion = "Unknown";
         parameters.applicationVersion = "1.0";
-
-        telegram.getClient().send(new TdApi.SetTdlibParameters(parameters));
+        return new TdApi.SetTdlibParameters(parameters);
     }
 
 

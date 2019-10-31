@@ -72,7 +72,7 @@ public final class Client implements Runnable {
             } else {
                 long queryId = currentQueryId.incrementAndGet();
                 handlers.put(queryId, future);
-                logger.info("NativeClientSend({}, {}, {})", nativeClientId, queryId, query);
+                logger.info("NativeClientSend({}, {})\n{}", nativeClientId, queryId, query);
                 nativeClientSend(nativeClientId, queryId, query);
             }
         } finally {

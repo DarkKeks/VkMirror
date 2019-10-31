@@ -3,6 +3,10 @@ package ru.darkkeks.vkmirror;
 
 import ru.darkkeks.vkmirror.vk.ChatType;
 
+/**
+ * An object describing the relationship between vk peer id (person, multichat or group) and telegram chat (bot or
+ * supergroup)
+ */
 public class Chat {
 
     private int id;

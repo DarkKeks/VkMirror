@@ -12,15 +12,15 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-// TODO Reflect changes in VkMirrorChat
 @Singleton
-public class ChatDao {
+public class VkMirrorDao {
 
-    private static final Logger logger = LoggerFactory.getLogger(ChatDao.class);
+    private static final Logger logger = LoggerFactory.getLogger(VkMirrorDao.class);
 
     private static final String SELECT_BY_VK = "SELECT * FROM chats WHERE vkPeerId = ?";
     private static final String SELECT_BY_TELEGRAM = "SELECT * FROM chats WHERE telegramGroupId = ?";
-    private static final String INSERT = "INSERT INTO chats(vkpeerid, telegramgroupid) VALUES (?, ?) RETURNING id";
+    private static final String INSERT = "INSERT INTO chats(vkpeerid, telegramgroupid, chattype) VALUES (?, ?, ?) " +
+            "RETURNING id";
 
     private static final String CHECK_SYNC_VK = "SELECT COUNT(*) FROM messages " +
             "WHERE chat_id = ? AND vkMessageId = ?";
@@ -32,7 +32,7 @@ public class ChatDao {
     private DataSource dataSource;
 
     @Inject
-    public ChatDao(DataSource dataSource) {
+    public VkMirrorDao(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 
@@ -46,7 +46,7 @@ public class ChatDao {
                         result.getInt("id"),
                         result.getInt("vkPeerId"),
                         result.getInt("telegramGroupId"),
-                        ChatType.values()[result.getInt("chatType")]);
+                        ChatType.valueOf(result.getString("chatType")));
             }
         } catch (SQLException e) {
             logger.error("Can't load chat", e);
@@ -74,8 +74,9 @@ public class ChatDao {
              PreparedStatement statement = connection.prepareStatement(INSERT)) {
             statement.setInt(1, chat.getVkPeerId());
             statement.setInt(2, chat.getTelegramId());
+            statement.setString(3, chat.getType().name());
             ResultSet resultSet = statement.executeQuery();
-            if(resultSet.next()) {
+            if (resultSet.next()) {
                 chat.setId(resultSet.getInt("id"));
             }
         } catch (SQLException e) {
@@ -84,12 +85,12 @@ public class ChatDao {
     }
 
     private boolean isSynced(String sql, int chatId, long messageId) {
-        try(Connection connection = dataSource.getConnection();
-            PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setInt(1, chatId);
             statement.setLong(2, messageId);
             ResultSet resultSet = statement.executeQuery();
-            if(resultSet.next()) {
+            if (resultSet.next()) {
                 int count = resultSet.getInt(1);
                 return count == 1;
             }
@@ -125,6 +126,4 @@ public class ChatDao {
             logger.error("Can't save chat", e);
         }
     }
-
-
 }

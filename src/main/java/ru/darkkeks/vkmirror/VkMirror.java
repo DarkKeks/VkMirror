@@ -23,7 +23,7 @@ import java.util.concurrent.ScheduledExecutorService;
 // TODO Think about possibility of someone else using this
 //  Having a lot of accounts can be not manageable for a lot of people
 //  Using one bot could be good use case if you dont mind bad look of chats
-//  So a good idea would be to support both modes, but I don't feel like doing it right now, so I will just like this
+//  So a good idea would be to support both modes, but I don't feel like doing it right now, so I will just leave this
 //  wall of text here, and maybe some day later I will look at it, return to this commit (#76cef1dc) and reuse a lot
 //  of message sync logic.
 
@@ -70,7 +70,7 @@ public class VkMirror {
 
     private VkController vkController;
     private TelegramClient telegram;
-    private ChatDao chatDao;
+    private VkMirrorDao vkMirrorDao;
     private ScheduledExecutorService executor;
 
     private Map<Integer, TelegramClient> clientsByVkId;
@@ -79,12 +79,12 @@ public class VkMirror {
     private Map<Integer, Chat> chatsByTelegramGroup;
 
     @Inject
-    public VkMirror(BotDataManager botDataManager, VkController vkController, TelegramClient telegram, ChatDao chatDao,
+    public VkMirror(BotDataManager botDataManager, VkController vkController, TelegramClient telegram, VkMirrorDao vkMirrorDao,
                     ScheduledExecutorService executor) {
         this.botDataManager = botDataManager;
         this.vkController = vkController;
         this.telegram = telegram;
-        this.chatDao = chatDao;
+        this.vkMirrorDao = vkMirrorDao;
         this.executor = executor;
 
         clientsByVkId = new HashMap<>();
@@ -122,16 +122,16 @@ public class VkMirror {
             int supergroupId = ((TdApi.ChatTypeSupergroup) chat.type).supergroupId;
 
             Chat mirrorChat = chatsByTelegramGroup.computeIfAbsent(supergroupId,
-                    chatDao::getChatByTelegramGroup);
+                    vkMirrorDao::getChatByTelegramGroup);
 
             if (mirrorChat != null) {
                 logger.info("Received message from myself id={} \"{}\"", message.id, message.content);
-                if (!chatDao.isSyncedTelegram(mirrorChat, message.id)) {
+                if (!vkMirrorDao.isSyncedTelegram(mirrorChat, message.id)) {
                     logger.info("Message {} is not synced", message.id);
                     List<Integer> ids = vkController.sendMessage(mirrorChat.getVkPeerId(), message);
                     logger.info("Produced vk messages: {}", ids.toString());
                     ids.forEach(id -> {
-                        chatDao.saveMessage(mirrorChat, id, message.id);
+                        vkMirrorDao.saveMessage(mirrorChat, id, message.id);
                     });
                 }
             }
@@ -141,10 +141,10 @@ public class VkMirror {
     /**
      * VK message -> Telegram (both from me and other chat participants)
      */
-    public void onVkMessage(Message message) {
+    private void onVkMessage(Message message) {
         logger.info("New message from {} -> id={} \"{}\"", message.getFrom(), message.getMessageId(), message.getText());
 
-        getTelegramChat(message.getPeerId()).thenAccept(chat -> {
+        getTelegramChat(message.getPeerId()).thenAccept((Chat chat) -> {
             if (chat == null) {
                 logger.warn("Was unable to mirror message from vk to telegram chat, getTelegramChat returned null: {}",
                         message);
@@ -152,7 +152,7 @@ public class VkMirror {
             }
 
             // TODO Chat direction;
-            if (!chatDao.isSyncedVk(chat, message.getMessageId())) {
+            if (!vkMirrorDao.isSyncedVk(chat, message.getMessageId())) {
                 CompletableFuture<TelegramClient> clientFuture;
 
                 // Message from myself
@@ -160,16 +160,18 @@ public class VkMirror {
                     clientFuture = CompletableFuture.completedFuture(telegram);
                 } else {
                     // Message is from one of the chat participants
-                    clientFuture = getBotForVkUser(message.getFrom());
+                    clientFuture = getBotForVkUser(message.getFrom())
+                            .thenCompose(this::getBotClient);
                 }
 
                 clientFuture.thenAccept(client -> {
                     if (chat.getType() == ChatType.PRIVATE) {
                         synchronized (this) {
                             int recipientId = client == telegram ? chat.getTelegramId() : telegram.getMyId();
+                            logger.info("Sending message {}", message.getText());
                             TdApi.Message tgMessage = client.sendMessage(recipientId, message.getText()).join();
                             logger.info("Message sent {}", tgMessage);
-                            chatDao.saveMessage(chat, message.getMessageId(), tgMessage.id);
+                            vkMirrorDao.saveMessage(chat, message.getMessageId(), tgMessage.id);
                             logger.info("Synced message {}!", tgMessage);
                         }
                     } else if (chat.getType() == ChatType.GROUP) {
@@ -179,7 +181,7 @@ public class VkMirror {
                                 synchronized (this) {
                                     TdApi.Message tgMessage = client.sendMessage(group.id, message.getText()).join();
                                     logger.info("Message sent {}", tgMessage);
-                                    chatDao.saveMessage(chat, message.getMessageId(), tgMessage.id);
+                                    vkMirrorDao.saveMessage(chat, message.getMessageId(), tgMessage.id);
                                     logger.info("Synced message {}!", tgMessage);
                                 }
                             });
@@ -187,9 +189,6 @@ public class VkMirror {
                     }
                 });
             }
-        }).exceptionally(e -> {
-            logger.error("Can't process new message", e);
-            return null;
         });
     }
 
@@ -197,10 +196,10 @@ public class VkMirror {
      * Chat has to be from my point of view, otherwise every private chat would have the same id
      * But to send message from bot we need chat from bots' perspective :(
      * <p>
-     * Lets get all chats from my point of view and apply some if magic to it afterwards ?
+     * Lets get all chats from my point of view and apply some if-magic to it afterwards ?
      */
     private CompletableFuture<Chat> getTelegramChat(int vkPeerId) {
-        Chat chat = chatsByPeerId.computeIfAbsent(vkPeerId, chatDao::getChatByVkPeer);
+        Chat chat = chatsByPeerId.computeIfAbsent(vkPeerId, vkMirrorDao::getChatByVkPeer);
 
         if (chat != null) {
             return CompletableFuture.completedFuture(chat);
@@ -223,20 +222,20 @@ public class VkMirror {
                 chatsByPeerId.put(vkPeerId, mirrorChat);
                 chatsByTelegramGroup.put(supergroup.supergroupId, mirrorChat);
 
-                chatDao.save(mirrorChat);
+                vkMirrorDao.save(mirrorChat);
                 return mirrorChat;
             });
         } else if (vkController.isPrivateChat(vkPeerId)) {
-            return createPrivateChat(vkPeerId).thenApply(bot -> {
-                if (bot == null) {
+            return createPrivateChat(vkPeerId).thenApply(botClient -> {
+                if (botClient == null) {
                     return null;
                 }
 
-                Chat mirrorChat = Chat.privateChat(vkPeerId, bot.getId());
+                Chat mirrorChat = Chat.privateChat(vkPeerId, botClient.getMyId());
 
                 chatsByPeerId.put(vkPeerId, mirrorChat);
 
-                chatDao.save(mirrorChat);
+                vkMirrorDao.save(mirrorChat);
                 return mirrorChat;
             });
         }
@@ -265,32 +264,31 @@ public class VkMirror {
         });
     }
 
-    private CompletableFuture<VkMirrorBot> createPrivateChat(int vkPeerId) {
-        return botDataManager.getBotForVk(vkPeerId).thenCompose(bot -> {
+    private CompletableFuture<TelegramClient> createPrivateChat(int vkPeerId) {
+        return getBotForVkUser(vkPeerId).thenCompose(bot -> {
             if (bot == null) {
                 return CompletableFuture.completedFuture(null);
             }
 
-            return telegram.searchPublicUsername(bot.getUsername()).thenApply(chat -> {
+            return telegram.searchPublicUsername(bot.getUsername()).thenCompose(chat -> {
                 // We assume bot will delete this message for both of us
                 telegram.sendMessage(chat.id, "/start");
-                return bot;
-            }).exceptionally(kek -> {
-                logger.error("Mda", kek);
-                return null;
+                return getBotClient(bot);
             });
         });
     }
 
-    private CompletableFuture<TelegramClient> getBotForVkUser(int vkId) {
-        if (clientsByVkId.containsKey(vkId)) {
-            return CompletableFuture.completedFuture(clientsByVkId.get(vkId));
-        } else {
-            return botDataManager.getBotForVk(vkId).thenApply(botInfo -> {
-                if (botInfo == null) return null;
+    private CompletableFuture<VkMirrorBot> getBotForVkUser(int vkId) {
+        return botDataManager.getBotForVk(vkId);
+    }
 
+    private CompletableFuture<TelegramClient> getBotClient(VkMirrorBot bot) {
+        if (clientsByVkId.containsKey(bot.getVkId())) {
+            return CompletableFuture.completedFuture(clientsByVkId.get(bot.getVkId()));
+        } else {
+            return CompletableFuture.supplyAsync(() -> {
                 TelegramClient client = new TelegramClient(TelegramCredentials.bot(
-                        Config.API_ID, Config.API_HASH, botInfo.getToken()));
+                        Config.API_ID, Config.API_HASH, bot.getToken()));
 
                 // TODO Test if bot can actually revoke this for me
                 client.onMessage(newMessage -> {
@@ -305,7 +303,10 @@ public class VkMirror {
                         }
                     }
                 });
-                clientsByVkId.put(vkId, client);
+
+                client.start();
+
+                clientsByVkId.put(bot.getVkId(), client);
                 return client;
             });
         }

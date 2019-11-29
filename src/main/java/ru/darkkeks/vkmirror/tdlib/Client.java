@@ -213,6 +213,7 @@ public final class Client implements Runnable {
             }
         } else if(handlers.containsKey(id)) {
             ForkJoinPool.commonPool().submit(() -> {
+                logger.info("{}", object);
                 handlers.get(id).complete(object);
             });
         }

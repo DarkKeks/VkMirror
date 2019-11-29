@@ -19,7 +19,8 @@ public class BotDao {
     private static final Logger logger = LoggerFactory.getLogger(BotDao.class);
 
     private static final String INSERT_BOT = "INSERT INTO bots(username, token, vk_id) VALUES (?, ?, ?) RETURNING id";
-    private static final String SELECT_BOT = "SELECT * FROM bots WHERE vk_id = ?";
+    private static final String SELECT_BOT_VK = "SELECT * FROM bots WHERE vk_id = ?";
+    private static final String SELECT_BOT_TELEGRAM = "SELECT * FROM bots WHERE username = ?";
 
     private DataSource dataSource;
 
@@ -42,10 +43,25 @@ public class BotDao {
         }
     }
 
+    public VkMirrorBot getBotByTelegramUsername(String username) {
+        logger.info("Selecting bot by telegram username {}", username);
+        try(Connection connection = dataSource.getConnection();
+            PreparedStatement preparedStatement = connection.prepareStatement(SELECT_BOT_TELEGRAM)) {
+            preparedStatement.setString(1, username);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            if(resultSet.next()) {
+                return constructBot(resultSet);
+            }
+        } catch (SQLException e) {
+            logger.error("Can't select bot by telegram username {}", username, e);
+        }
+        return null;
+    }
+
     public VkMirrorBot getBotByVkId(int vkId) {
         logger.info("Selecting bot by vk_id {}", vkId);
         try(Connection connection = dataSource.getConnection();
-            PreparedStatement preparedStatement = connection.prepareStatement(SELECT_BOT)) {
+            PreparedStatement preparedStatement = connection.prepareStatement(SELECT_BOT_VK)) {
             preparedStatement.setInt(1, vkId);
             ResultSet resultSet = preparedStatement.executeQuery();
             if(resultSet.next()) {
@@ -60,7 +76,7 @@ public class BotDao {
     public List<VkMirrorBot> getFreeBots() {
         logger.info("Selecting free bots");
         try(Connection connection = dataSource.getConnection();
-            PreparedStatement preparedStatement = connection.prepareStatement(SELECT_BOT)) {
+            PreparedStatement preparedStatement = connection.prepareStatement(SELECT_BOT_VK)) {
             preparedStatement.setInt(1, VkMirrorBot.VK_NOT_ASSIGNED);
             ResultSet resultSet = preparedStatement.executeQuery();
             List<VkMirrorBot> result = new ArrayList<>();

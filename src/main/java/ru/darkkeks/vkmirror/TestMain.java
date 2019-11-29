@@ -2,12 +2,27 @@ package ru.darkkeks.vkmirror;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ru.darkkeks.vkmirror.tdlib.TelegramClient;
+import ru.darkkeks.vkmirror.tdlib.TelegramCredentials;
 
 public class TestMain {
 
     private static final Logger logger = LoggerFactory.getLogger(TestMain.class);
 
     public static void main(String[] args) {
+//        TelegramClient c1 = new TelegramClient(TelegramCredentials.phone(Config.API_ID, Config.API_HASH,
+//                Config.PHONE_NUMBER));
+        TelegramClient c2 = new TelegramClient(TelegramCredentials.bot(Config.API_ID, Config.API_HASH,
+                "799490609:AAFujtoE1oKSO4K1_eBTs1XucxKqZ2OzhNs"));
+
+//        c1.start();
+        c2.start();
+//        c1.groupById(1357704609).thenAccept(g -> {
+//            c1.chatAddUser(g.get().id, c2.getMyId());
+//        });
+        c2.groupById(1357704609);
+
+
 
 //        kek.createPrivateChat(177257181).thenRun(() -> {
 //            kek.sendMessage(177257181, "Alo");

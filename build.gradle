@@ -7,7 +7,7 @@ plugins {
 group 'ru.darkkeks'
 version '1.0-SNAPSHOT'
 
-mainClassName = 'ru.darkkeks.vkmirror.Main'
+mainClassName = 'ru.darkkeks.vkmirror.MainMain'
 
 sourceCompatibility = 1.11
 

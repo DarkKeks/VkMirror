@@ -114,27 +114,35 @@ public class VkMirror {
      */
     private void onTelegramMessage(TdApi.Message message) {
         long chatId = message.chatId;
-
         if (message.senderUserId != telegram.getMyId()) return;
 
         TdApi.Chat chat = telegram.getChat(chatId);
-        if (chat != null && chat.type instanceof TdApi.ChatTypeSupergroup) {
-            int supergroupId = ((TdApi.ChatTypeSupergroup) chat.type).supergroupId;
 
-            Chat mirrorChat = chatsByTelegramGroup.computeIfAbsent(supergroupId,
-                    vkMirrorDao::getChatByTelegramGroup);
+        Chat mirrorChat;
+        if (chat.type instanceof TdApi.ChatTypePrivate) {
+            TdApi.ChatTypePrivate privateChat = (TdApi.ChatTypePrivate) chat.type;
+            mirrorChat = getMirrorChat(privateChat.userId);
+        } else if (chat.type instanceof TdApi.ChatTypeSupergroup) {
+            TdApi.ChatTypeSupergroup supergroup = (TdApi.ChatTypeSupergroup) chat.type;
+            mirrorChat = getMirrorChat(supergroup.supergroupId);
+        } else {
+            return;
+        }
 
-            if (mirrorChat != null) {
-                logger.info("Received message from myself id={} \"{}\"", message.id, message.content);
-                if (!vkMirrorDao.isSyncedTelegram(mirrorChat, message.id)) {
-                    logger.info("Message {} is not synced", message.id);
-                    List<Integer> ids = vkController.sendMessage(mirrorChat.getVkPeerId(), message);
-                    logger.info("Produced vk messages: {}", ids.toString());
-                    ids.forEach(id -> {
-                        vkMirrorDao.saveMessage(mirrorChat, id, message.id);
-                    });
-                }
-            }
+        if (mirrorChat != null) {
+            handleTelegramMessage(mirrorChat, message);
+        }
+    }
+
+    private void handleTelegramMessage(Chat chat, TdApi.Message message) {
+        logger.info("Received supergroup message from myself id={} \"{}\"", message.id, message.content);
+        if (!vkMirrorDao.isSyncedTelegram(chat, message.id)) {
+            logger.info("Message {} is not synced", message.id);
+            List<Integer> ids = vkController.sendMessage(chat.getVkPeerId(), message);
+            logger.info("Produced vk messages: {}", ids.toString());
+            ids.forEach(id -> {
+                vkMirrorDao.saveMessage(chat, id, message.id);
+            });
         }
     }
 
@@ -144,7 +152,7 @@ public class VkMirror {
     private void onVkMessage(Message message) {
         logger.info("New message from {} -> id={} \"{}\"", message.getFrom(), message.getMessageId(), message.getText());
 
-        getTelegramChat(message.getPeerId()).thenAccept((Chat chat) -> {
+        getTelegramChat(message.getPeerId()).thenAccept(chat -> {
             if (chat == null) {
                 logger.warn("Was unable to mirror message from vk to telegram chat, getTelegramChat returned null: {}",
                         message);
@@ -152,44 +160,63 @@ public class VkMirror {
             }
 
             // TODO Chat direction;
-            if (!vkMirrorDao.isSyncedVk(chat, message.getMessageId())) {
-                CompletableFuture<TelegramClient> clientFuture;
+            if (vkMirrorDao.isSyncedVk(chat, message.getMessageId())) {
+                return;
+            }
 
-                // Message from myself
-                if ((message.getFlags() & Message.Flags.OUTBOX) > 0) {
-                    clientFuture = CompletableFuture.completedFuture(telegram);
-                } else {
-                    // Message is from one of the chat participants
-                    clientFuture = getBotForVkUser(message.getFrom())
-                            .thenCompose(this::getBotClient);
-                }
+            CompletableFuture<TelegramClient> clientFuture;
 
+            // Message from myself
+            if ((message.getFlags() & Message.Flags.OUTBOX) > 0) {
+                clientFuture = CompletableFuture.completedFuture(telegram);
+            } else {
+                // Message is from one of the chat participants
+                clientFuture = getBotForVkUser(message.getFrom())
+                        .thenCompose(this::getBotClient);
+            }
+
+            if (chat.getType() == ChatType.PRIVATE) {
                 clientFuture.thenAccept(client -> {
-                    if (chat.getType() == ChatType.PRIVATE) {
-                        synchronized (this) {
-                            int recipientId = client == telegram ? chat.getTelegramId() : telegram.getMyId();
-                            logger.info("Sending message {}", message.getText());
-                            TdApi.Message tgMessage = client.sendMessage(recipientId, message.getText()).join();
-                            logger.info("Message sent {}", tgMessage);
-                            vkMirrorDao.saveMessage(chat, message.getMessageId(), tgMessage.id);
-                            logger.info("Synced message {}!", tgMessage);
-                        }
-                    } else if (chat.getType() == ChatType.GROUP) {
-                        client.groupById(chat.getTelegramId()).thenAccept(group -> {
-                            logger.info("Sending to chat {}", group.id);
-                            executor.submit(() -> {
-                                synchronized (this) {
-                                    TdApi.Message tgMessage = client.sendMessage(group.id, message.getText()).join();
-                                    logger.info("Message sent {}", tgMessage);
-                                    vkMirrorDao.saveMessage(chat, message.getMessageId(), tgMessage.id);
-                                    logger.info("Synced message {}!", tgMessage);
-                                }
-                            });
-                        });
+                    int recipientId = client == telegram ? chat.getTelegramId() : telegram.getMyId();
+                    synchronized (this) {
+                        logger.info("Sending message {}", message.getText());
+                        TdApi.Message tgMessage = client.sendMessage(recipientId, message.getText()).join();
+                        logger.info("Message sent {}", tgMessage);
+                        vkMirrorDao.saveMessage(chat, message.getMessageId(), tgMessage.id);
+                        logger.info("Synced message {}!", tgMessage);
                     }
                 });
+            } else if (chat.getType() == ChatType.GROUP) {
+                clientFuture.thenAccept(client -> client.groupById(chat.getTelegramId()).thenAccept(groupOptional -> {
+                    if (groupOptional.isEmpty()) {
+                        telegram.groupById(chat.getTelegramId())
+                                .thenCompose(group -> telegram.chatAddUser(group.orElseThrow().id, client.getMyId()))
+                                .thenCompose(ok -> client.groupById(chat.getTelegramId()))
+                                .thenAccept(group -> {
+                            sendVkMessage(client, chat, group.orElseThrow().id, message);
+                        });
+                    } else {
+                        client.groupById(chat.getTelegramId()).thenAccept(group -> {
+                            sendVkMessage(client, chat, group.orElseThrow().id, message);
+                        });
+                    }
+                }));
             }
         });
+    }
+
+    private Chat getMirrorChat(int telegramId) {
+        return chatsByTelegramGroup.computeIfAbsent(telegramId, vkMirrorDao::getChatByTelegramGroup);
+    }
+
+    private void sendVkMessage(TelegramClient client, Chat chat, long chatId, Message message) {
+        logger.info("Sending to chat {}", chatId);
+        synchronized (this) {
+            TdApi.Message tgMessage = client.sendMessage(chatId, message.getText()).join();
+            logger.info("Message sent {}", tgMessage);
+            vkMirrorDao.saveMessage(chat, message.getMessageId(), tgMessage.id);
+            logger.info("Synced message {}!", tgMessage);
+        }
     }
 
     /**
@@ -245,20 +272,20 @@ public class VkMirror {
 
     private CompletableFuture<TdApi.Chat> createTelegramGroup(int vkPeerId, String title) {
         String chatUrl = vkController.getChatUrl(vkPeerId);
-        return telegram.createChannel(title, chatUrl).thenApply(chat -> {
+        return telegram.createSupergroup(title, chatUrl).thenApply(chat -> {
             TdApi.ChatType type = chat.type;
             if (type instanceof TdApi.ChatTypeSupergroup) {
                 // TODO Should join every person that is already bound to a bot;
                 //  Other people should be added only on activity in chat
 //                telegram.chatAddUser(chat.id, bot.getMyId()).join();
 
+                // TODO Maybe photo download should be async
                 Path photo = vkController.downloadConversationImage(vkPeerId);
                 if (photo != null) {
                     telegram.setGroupPhoto(chat.id, photo).join();
                 }
-
             } else {
-                throw new IllegalStateException("New chat is not channel");
+                throw new IllegalStateException("New chat is not a supergroup");
             }
             return chat;
         });
@@ -282,6 +309,10 @@ public class VkMirror {
         return botDataManager.getBotForVk(vkId);
     }
 
+    private CompletableFuture<VkMirrorBot> getBotForTelegramBot(String username) {
+        return botDataManager.getBotForTelegram(username);
+    }
+
     private CompletableFuture<TelegramClient> getBotClient(VkMirrorBot bot) {
         if (clientsByVkId.containsKey(bot.getVkId())) {
             return CompletableFuture.completedFuture(clientsByVkId.get(bot.getVkId()));
@@ -290,7 +321,6 @@ public class VkMirror {
                 TelegramClient client = new TelegramClient(TelegramCredentials.bot(
                         Config.API_ID, Config.API_HASH, bot.getToken()));
 
-                // TODO Test if bot can actually revoke this for me
                 client.onMessage(newMessage -> {
                     TdApi.Message message = newMessage.message;
                     if (message.content instanceof TdApi.MessageText) {

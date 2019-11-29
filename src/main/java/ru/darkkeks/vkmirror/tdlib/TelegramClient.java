@@ -114,13 +114,17 @@ public class TelegramClient {
                 .thenAccept(x -> {});
     }
 
+    public CompletableFuture<TdApi.User> getUser(int userId) {
+        return client.send(new TdApi.GetUser(userId)).thenApply(object -> (TdApi.User) object);
+    }
+
     public CompletableFuture<Void> chatAddUser(long id, int userId) {
-        return client.send(new TdApi.GetUser(userId)).thenCompose(user -> {
+        return getUser(userId).thenCompose(user -> {
             return client.send(new TdApi.AddChatMember(id, userId, 100)).thenAccept(x -> {});
         });
     }
 
-    public CompletableFuture<TdApi.Chat> createChannel(String title, String description) {
+    public CompletableFuture<TdApi.Chat> createSupergroup(String title, String description) {
         return client.send(new TdApi.CreateNewSupergroupChat(title, false, description)).thenApply(result -> {
             if(result instanceof TdApi.Error) {
                 logger.error("Error creating channel {}: {} ", title, result);
@@ -150,12 +154,13 @@ public class TelegramClient {
                 .thenApply(x -> (TdApi.Message)x);
     }
 
-    public CompletableFuture<TdApi.Chat> groupById(int channelId) {
-        return client.send(new TdApi.CreateSupergroupChat(channelId, false)).thenApply(result -> {
+    public CompletableFuture<Optional<TdApi.Chat>> groupById(int supergroupId) {
+        return client.send(new TdApi.CreateSupergroupChat(supergroupId, false)).thenApply(result -> {
             if(result instanceof TdApi.Error) {
-                throw new IllegalStateException(result.toString());
+                logger.info("Can't get group {}", result);
+                return Optional.empty();
             }
-            return (TdApi.Chat) result;
+            return Optional.of(((TdApi.Chat) result));
         });
     }
 

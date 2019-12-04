@@ -1,5 +1,6 @@
 package ru.darkkeks.vkmirror;
 
+import kotlin.Unit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.darkkeks.vkmirror.autoreg.BotDataManager;
@@ -8,8 +9,8 @@ import ru.darkkeks.vkmirror.tdlib.TdApi;
 import ru.darkkeks.vkmirror.tdlib.TelegramClient;
 import ru.darkkeks.vkmirror.tdlib.TelegramCredentials;
 import ru.darkkeks.vkmirror.vk.ChatType;
-import ru.darkkeks.vkmirror.vk.UserLongPoll;
 import ru.darkkeks.vkmirror.vk.VkController;
+import ru.darkkeks.vkmirror.vk.VkUtilKt;
 import ru.darkkeks.vkmirror.vk.object.Message;
 
 import javax.inject.Inject;
@@ -105,8 +106,12 @@ public class VkMirror {
 
         telegram.start();
 
-        UserLongPoll longPoll = new UserLongPoll(vkController.getClient(), vkController.getActor(), this::onVkMessage);
-        executor.submit(() -> vkController.run(longPoll));
+        vkController.runLongPoll(message -> {
+            onVkMessage(message);
+
+            // Temporary hack to pass (Message) -> Unit to kotlin runLongPoll
+            return Unit.INSTANCE;
+        });
     }
 
     /**
@@ -239,7 +244,7 @@ public class VkMirror {
 //
 //                return chat;
 //            });
-        } else if (vkController.isMultichat(vkPeerId)) {
+        } else if (VkUtilKt.isMultichat(vkPeerId)) {
             return CompletableFuture.supplyAsync(() -> {
                 TdApi.Chat tgChat = createTelegramGroup(vkPeerId, vkController.getChannelTitle(vkPeerId)).join();
                 TdApi.ChatTypeSupergroup supergroup = (TdApi.ChatTypeSupergroup) tgChat.type;
@@ -252,7 +257,7 @@ public class VkMirror {
                 vkMirrorDao.save(mirrorChat);
                 return mirrorChat;
             });
-        } else if (vkController.isPrivateChat(vkPeerId)) {
+        } else if (VkUtilKt.isPrivateChat(vkPeerId)) {
             return createPrivateChat(vkPeerId).thenApply(botClient -> {
                 if (botClient == null) {
                     return null;
@@ -271,7 +276,7 @@ public class VkMirror {
     }
 
     private CompletableFuture<TdApi.Chat> createTelegramGroup(int vkPeerId, String title) {
-        String chatUrl = vkController.getChatUrl(vkPeerId);
+        String chatUrl = VkUtilKt.getChatUrl(vkPeerId);
         return telegram.createSupergroup(title, chatUrl).thenApply(chat -> {
             TdApi.ChatType type = chat.type;
             if (type instanceof TdApi.ChatTypeSupergroup) {

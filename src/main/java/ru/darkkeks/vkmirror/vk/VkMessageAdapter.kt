@@ -1,7 +1,7 @@
 package ru.darkkeks.vkmirror.vk
 
 import com.vk.api.sdk.queries.messages.MessagesSendQuery
-import ru.darkkeks.vkmirror.tdlib.TdApi
+import ru.darkkeks.vkmirror.tdlib.internal.TdApi
 
 class VkMessageAdapter(val queryProvider: () -> MessagesSendQuery) {
 

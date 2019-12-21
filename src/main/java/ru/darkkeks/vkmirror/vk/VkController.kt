@@ -4,7 +4,7 @@ import com.vk.api.sdk.client.VkApiClient
 import com.vk.api.sdk.client.actors.UserActor
 import com.vk.api.sdk.exceptions.ApiException
 import com.vk.api.sdk.objects.users.Fields
-import ru.darkkeks.vkmirror.tdlib.TdApi
+import ru.darkkeks.vkmirror.tdlib.internal.TdApi
 import ru.darkkeks.vkmirror.util.logger
 import ru.darkkeks.vkmirror.vk.`object`.Message
 import java.io.FileOutputStream

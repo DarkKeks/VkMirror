@@ -4,8 +4,7 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import ru.darkkeks.vkmirror.tdlib.TelegramClient;
-import ru.darkkeks.vkmirror.tdlib.TdApi;
+import ru.darkkeks.vkmirror.tdlib.internal.TdApi;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;

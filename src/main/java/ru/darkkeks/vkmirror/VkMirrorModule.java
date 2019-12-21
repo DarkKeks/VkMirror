@@ -9,7 +9,7 @@ import com.vk.api.sdk.httpclient.HttpTransportClient;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import ru.darkkeks.vkmirror.tdlib.TelegramClient;
-import ru.darkkeks.vkmirror.tdlib.TelegramCredentials;
+import ru.darkkeks.vkmirror.tdlib.TelegramCredentialsKt;
 import ru.darkkeks.vkmirror.vk.object.Message;
 
 import javax.inject.Singleton;
@@ -22,7 +22,10 @@ public class VkMirrorModule extends AbstractModule {
     @Provides
     @Singleton
     public TelegramClient providesTelegramClient() {
-        return new TelegramClient(TelegramCredentials.phone(Config.API_ID, Config.API_HASH, Config.PHONE_NUMBER));
+        return new TelegramClient(TelegramCredentialsKt.userTelegramCredentials(
+                Config.API_ID,
+                Config.API_HASH,
+                Config.PHONE_NUMBER));
     }
 
     @Provides

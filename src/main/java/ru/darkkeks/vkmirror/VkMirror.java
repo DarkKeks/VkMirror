@@ -5,9 +5,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ru.darkkeks.vkmirror.autoreg.BotDataManager;
 import ru.darkkeks.vkmirror.autoreg.VkMirrorBot;
-import ru.darkkeks.vkmirror.tdlib.TdApi;
 import ru.darkkeks.vkmirror.tdlib.TelegramClient;
-import ru.darkkeks.vkmirror.tdlib.TelegramCredentials;
+import ru.darkkeks.vkmirror.tdlib.TelegramCredentialsKt;
+import ru.darkkeks.vkmirror.tdlib.internal.TdApi;
 import ru.darkkeks.vkmirror.vk.ChatType;
 import ru.darkkeks.vkmirror.vk.VkController;
 import ru.darkkeks.vkmirror.vk.VkUtilKt;
@@ -80,7 +80,8 @@ public class VkMirror {
     private Map<Integer, Chat> chatsByTelegramGroup;
 
     @Inject
-    public VkMirror(BotDataManager botDataManager, VkController vkController, TelegramClient telegram, VkMirrorDao vkMirrorDao,
+    public VkMirror(BotDataManager botDataManager, VkController vkController, TelegramClient telegram,
+                    VkMirrorDao vkMirrorDao,
                     ScheduledExecutorService executor) {
         this.botDataManager = botDataManager;
         this.vkController = vkController;
@@ -155,7 +156,8 @@ public class VkMirror {
      * VK message -> Telegram (both from me and other chat participants)
      */
     private void onVkMessage(Message message) {
-        logger.info("New message from {} -> id={} \"{}\"", message.getFrom(), message.getMessageId(), message.getText());
+        logger.info("New message from {} -> id={} \"{}\"", message.getFrom(), message.getMessageId(),
+                message.getText());
 
         getTelegramChat(message.getPeerId()).thenAccept(chat -> {
             if (chat == null) {
@@ -198,8 +200,8 @@ public class VkMirror {
                                 .thenCompose(group -> telegram.chatAddUser(group.orElseThrow().id, client.getMyId()))
                                 .thenCompose(ok -> client.groupById(chat.getTelegramId()))
                                 .thenAccept(group -> {
-                            sendVkMessage(client, chat, group.orElseThrow().id, message);
-                        });
+                                    sendVkMessage(client, chat, group.orElseThrow().id, message);
+                                });
                     } else {
                         client.groupById(chat.getTelegramId()).thenAccept(group -> {
                             sendVkMessage(client, chat, group.orElseThrow().id, message);
@@ -323,7 +325,7 @@ public class VkMirror {
             return CompletableFuture.completedFuture(clientsByVkId.get(bot.getVkId()));
         } else {
             return CompletableFuture.supplyAsync(() -> {
-                TelegramClient client = new TelegramClient(TelegramCredentials.bot(
+                TelegramClient client = new TelegramClient(TelegramCredentialsKt.userTelegramCredentials(
                         Config.API_ID, Config.API_HASH, bot.getToken()));
 
                 client.onMessage(newMessage -> {

@@ -30,15 +30,15 @@ static td::Client *get_client(jlong client_id) {
   return reinterpret_cast<td::Client *>(static_cast<std::uintptr_t>(client_id));
 }
 
-static jlong Client_createNativeClient(JNIEnv *env, jclass clazz) {
+static jlong TdClient_createNativeClient(JNIEnv *env, jclass clazz) {
   return static_cast<jlong>(reinterpret_cast<std::uintptr_t>(new td::Client()));
 }
 
-static void Client_nativeClientSend(JNIEnv *env, jclass clazz, jlong client_id, jlong id, jobject function) {
+static void TdClient_nativeClientSend(JNIEnv *env, jclass clazz, jlong client_id, jlong id, jobject function) {
   get_client(client_id)->send({static_cast<std::uint64_t>(id), fetch_function(env, function)});
 }
 
-static jint Client_nativeClientReceive(JNIEnv *env, jclass clazz, jlong client_id, jlongArray ids, jobjectArray events,
+static jint TdClient_nativeClientReceive(JNIEnv *env, jclass clazz, jlong client_id, jlongArray ids, jobjectArray events,
                                        jdouble timeout) {
   auto client = get_client(client_id);
   jsize events_size = env->GetArrayLength(ids);  // ids and events size must be of equal size
@@ -67,13 +67,13 @@ static jint Client_nativeClientReceive(JNIEnv *env, jclass clazz, jlong client_i
   return result_size;
 }
 
-static jobject Client_nativeClientExecute(JNIEnv *env, jclass clazz, jobject function) {
+static jobject TdClient_nativeClientExecute(JNIEnv *env, jclass clazz, jobject function) {
   jobject result;
   td::Client::execute({0, fetch_function(env, function)}).object->store(env, result);
   return result;
 }
 
-static void Client_destroyNativeClient(JNIEnv *env, jclass clazz, jlong client_id) {
+static void TdClient_destroyNativeClient(JNIEnv *env, jclass clazz, jlong client_id) {
   delete get_client(client_id);
 }
 
@@ -126,18 +126,18 @@ static jint register_native(JavaVM *vm) {
                                     reinterpret_cast<void *>(function_ptr));
   };
 
-  auto client_class = td::jni::get_jclass(env, PACKAGE_NAME "/Client");
+  auto client_class = td::jni::get_jclass(env, PACKAGE_NAME "/TdClient");
   log_class = td::jni::get_jclass(env, PACKAGE_NAME "/Log");
   auto object_class = td::jni::get_jclass(env, PACKAGE_NAME "/TdApi$Object");
   auto function_class = td::jni::get_jclass(env, PACKAGE_NAME "/TdApi$Function");
 
 #define TD_OBJECT "L" PACKAGE_NAME "/TdApi$Object;"
 #define TD_FUNCTION "L" PACKAGE_NAME "/TdApi$Function;"
-  register_method(client_class, "createNativeClient", "()J", Client_createNativeClient);
-  register_method(client_class, "nativeClientSend", "(JJ" TD_FUNCTION ")V", Client_nativeClientSend);
-  register_method(client_class, "nativeClientReceive", "(J[J[" TD_OBJECT "D)I", Client_nativeClientReceive);
-  register_method(client_class, "nativeClientExecute", "(" TD_FUNCTION ")" TD_OBJECT, Client_nativeClientExecute);
-  register_method(client_class, "destroyNativeClient", "(J)V", Client_destroyNativeClient);
+  register_method(client_class, "createNativeClient", "()J", TdClient_createNativeClient);
+  register_method(client_class, "nativeClientSend", "(JJ" TD_FUNCTION ")V", TdClient_nativeClientSend);
+  register_method(client_class, "nativeClientReceive", "(J[J[" TD_OBJECT "D)I", TdClient_nativeClientReceive);
+  register_method(client_class, "nativeClientExecute", "(" TD_FUNCTION ")" TD_OBJECT, TdClient_nativeClientExecute);
+  register_method(client_class, "destroyNativeClient", "(J)V", TdClient_destroyNativeClient);
 
   register_method(log_class, "setVerbosityLevel", "(I)V", Log_setVerbosityLevel);
   register_method(log_class, "setFilePath", "(Ljava/lang/String;)Z", Log_setFilePath);

@@ -8,7 +8,7 @@ fun botTelegramCredentials(apiId: Int, apiHash: String, botToken: String) =
         TelegramCredentials(apiId, apiHash, true, botToken = botToken)
 
 fun userTelegramCredentials(apiId: Int, apiHash: String, phoneNumber: String) =
-        TelegramCredentials(apiId, apiHash, true, phoneNumber = phoneNumber)
+        TelegramCredentials(apiId, apiHash, false, phoneNumber = phoneNumber)
 
 class TelegramCredentials(
         val apiId: Int,

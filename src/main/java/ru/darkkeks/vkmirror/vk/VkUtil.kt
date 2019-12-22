@@ -27,7 +27,7 @@ fun isPrivateChat(id: Int): Boolean {
 }
 
 
-fun getChatUrl(peerId: Int): String? {
+fun getChatUrl(peerId: Int): String {
     if (isMultichat(peerId)) {
         return "https://vk.com/im?sel=c${peerId - MULTICHAT_BASE}"
     } else if (isGroup(peerId)) {

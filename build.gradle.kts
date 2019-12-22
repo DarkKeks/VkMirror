@@ -10,26 +10,23 @@ group = "ru.darkkeks"
 version = "1.0-SNAPSHOT"
 
 application {
-    mainClassName = "ru.darkkeks.vkmirror.MainMain"
+    mainClassName = "ru.darkkeks.vkmirror.MainKt"
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_1_8
 }
 
 dependencies {
-    implementation("com.google.inject:guice:4.2.2")
-
     implementation("com.vk.api:sdk:1.0.2")
-
-    implementation("org.telegram:telegrambots:4.3.1")
-
-    implementation("com.zaxxer:HikariCP:3.3.1")
-    implementation("org.postgresql:postgresql:42.2.5")
 
     implementation("org.apache.logging.log4j", "log4j-slf4j-impl", "2.8.2")
     implementation("org.apache.logging.log4j", "log4j-api", "2.8.2")
     implementation("org.apache.logging.log4j", "log4j-core", "2.8.2")
+
+    implementation("org.litote.kmongo:kmongo-coroutine:3.11.2")
+
+    implementation("org.kodein.di:kodein-di-generic-jvm:6.5.0")
 
     implementation(kotlin("reflect"))
     implementation(kotlin("stdlib-jdk8"))
@@ -38,6 +35,7 @@ dependencies {
 
 repositories {
     mavenCentral()
+    jcenter()
 }
 
 tasks.withType(JavaExec::class) {
@@ -49,10 +47,10 @@ tasks.withType(JavaExec::class) {
 
 val compileKotlin: KotlinCompile by tasks
 compileKotlin.kotlinOptions {
-    jvmTarget = "11"
+    jvmTarget = "1.8"
 }
 
 val compileTestKotlin: KotlinCompile by tasks
 compileTestKotlin.kotlinOptions {
-    jvmTarget = "11"
+    jvmTarget = "1.8"
 }

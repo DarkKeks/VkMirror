@@ -4,6 +4,8 @@ import com.vk.api.sdk.client.VkApiClient
 import com.vk.api.sdk.client.actors.UserActor
 import com.vk.api.sdk.exceptions.ApiException
 import com.vk.api.sdk.objects.users.Fields
+import org.kodein.di.Kodein
+import org.kodein.di.generic.instance
 import ru.darkkeks.vkmirror.tdlib.internal.TdApi
 import ru.darkkeks.vkmirror.util.logger
 import ru.darkkeks.vkmirror.vk.`object`.Message
@@ -12,10 +14,12 @@ import java.net.URL
 import java.nio.channels.Channels
 import java.nio.file.Files
 import java.nio.file.Path
-import javax.inject.Inject
 import kotlin.random.Random
 
-class VkController @Inject constructor(val client: VkApiClient, val actor: UserActor) {
+class VkController(kodein: Kodein) {
+
+    val client: VkApiClient by kodein.instance()
+    val actor: UserActor by kodein.instance()
 
     private val myId: Int
 

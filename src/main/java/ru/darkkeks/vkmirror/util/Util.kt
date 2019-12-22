@@ -12,3 +12,7 @@ fun prompt(message: String): String {
     print(": ")
     return readLine() ?: ""
 }
+
+fun getEnv(name: String): String {
+    return System.getenv(name) ?: throw IllegalStateException("No env variable $name")
+}

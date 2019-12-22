@@ -1,6 +1,10 @@
 package ru.darkkeks.vkmirror.tdlib.internal
 
 import kotlinx.coroutines.CompletableDeferred
+import ru.darkkeks.vkmirror.API_HASH
+import ru.darkkeks.vkmirror.API_ID
+import ru.darkkeks.vkmirror.PHONE_NUMBER
+import ru.darkkeks.vkmirror.tdlib.userTelegramCredentials
 import ru.darkkeks.vkmirror.util.NativeUtils
 import ru.darkkeks.vkmirror.util.logger
 import java.util.concurrent.ConcurrentHashMap
@@ -48,8 +52,9 @@ class TdClient(val updateHandler: (TdApi.Object) -> Unit,
      */
     fun send(request: TdApi.Function) = lock.read {
         if (!isClientDestroyed) {
-            logger.info("NativeClientSend\n$request")
-            nativeClientSend(clientId, queryIdCounter.getAndIncrement(), request)
+            val requestId = queryIdCounter.getAndIncrement()
+            println("send -- nativeClientSend\n$request")
+            nativeClientSend(clientId, requestId, request)
         }
     }
 
@@ -63,7 +68,7 @@ class TdClient(val updateHandler: (TdApi.Object) -> Unit,
         } else {
             val requestId = queryIdCounter.getAndIncrement()
             requests[requestId] = result
-            logger.info("NativeClientSend\n$request")
+            println("request -- nativeClientSend $requestId \n$request")
             nativeClientSend(clientId, requestId, request)
         }
         return result.await()
@@ -117,8 +122,8 @@ class TdClient(val updateHandler: (TdApi.Object) -> Unit,
         init {
             NativeUtils.loadLibraryFromJar("/libtdjni.so")
 
-            execute(TdApi.SetLogStream(TdApi.LogStreamFile("tdlib.log", 1 shl 27)))
-            execute(TdApi.SetLogVerbosityLevel(5))
+//            execute(TdApi.SetLogStream(TdApi.LogStreamFile("tdlib.log", 1 shl 27)))
+            execute(TdApi.SetLogVerbosityLevel(2))
         }
 
         @JvmStatic
@@ -138,6 +143,68 @@ class TdClient(val updateHandler: (TdApi.Object) -> Unit,
 
         fun execute(function: TdApi.Function) {
             nativeClientExecute(function)
+        }
+    }
+}
+
+fun main() {
+    val id = TdClient.createNativeClient()
+
+    val events = Array<TdApi.Object?>(1000) { null }
+    val eventIds = LongArray(1000)
+
+    val credentials = userTelegramCredentials(API_ID, API_HASH, PHONE_NUMBER)
+
+    var reqId = 1L;
+
+    val send : (TdApi.Function) -> Unit = {
+        println("Sending with id $reqId $it")
+        TdClient.nativeClientSend(id, reqId++, it)
+    }
+
+    send(TdApi.DisableProxy())
+
+    while (true) {
+        val count = TdClient.nativeClientReceive(id, eventIds, events, 300.0)
+        repeat(count) {
+            val event = events[it]
+            events[it] = null
+
+            println("Received $event")
+
+            when (event) {
+                is TdApi.UpdateAuthorizationState -> when (event.authorizationState) {
+                    is TdApi.AuthorizationStateWaitTdlibParameters -> {
+                        send(TdApi.SetTdlibParameters(TdApi.TdlibParameters().apply {
+                            databaseDirectory = credentials.dataDirectory
+                            enableStorageOptimizer = true
+                            useMessageDatabase = true
+                            apiId = credentials.apiId
+                            apiHash = credentials.apiHash
+                            systemLanguageCode = "en"
+                            deviceModel = "Desktop"
+                            systemVersion = "Unknown"
+                            applicationVersion = "1.0"
+                        }))
+                    }
+
+                    is TdApi.AuthorizationStateWaitEncryptionKey -> {
+                        send(TdApi.CheckDatabaseEncryptionKey())
+                    }
+
+                    is TdApi.AuthorizationStateWaitPhoneNumber -> {
+                        send(credentials.credentialsFunction)
+                    }
+
+                    is TdApi.AuthorizationStateWaitCode -> {
+                        send
+                    }
+
+                    is TdApi.AuthorizationStateReady -> {
+                        send(TdApi.SearchPublicChat("BotFather"))
+                    }
+                }
+            }
         }
     }
 }

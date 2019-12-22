@@ -57,8 +57,8 @@ class TelegramClient(credentials: TelegramCredentials) {
 
     fun getChat(id: Long) = chats[id]
 
-    fun onMessage(handler: (TdApi.Message) -> Unit) {
-        updateHandler.addHandler(TdApi.Message::class, handler)
+    fun onMessage(handler: (TdApi.UpdateNewMessage) -> Unit) {
+        updateHandler.addHandler(TdApi.UpdateNewMessage::class, handler)
     }
 
     suspend fun setGroupPhoto(chatId: Long, file: Path) {

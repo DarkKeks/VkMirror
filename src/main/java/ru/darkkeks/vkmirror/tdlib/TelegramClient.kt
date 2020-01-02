@@ -42,7 +42,7 @@ class TelegramClient(credentials: TelegramCredentials) {
         }
     }
 
-    fun start() {
+    suspend fun start() {
         client.start()
         authHandler.awaitAuthorization()
     }

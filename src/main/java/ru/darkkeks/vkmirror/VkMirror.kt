@@ -22,10 +22,14 @@ class VkMirror(kodein: Kodein) {
 
     private val clients = mutableMapOf<MirrorBot, TelegramClient>()
 
+    private val mutex = Mutex()
+
+    private val scope = CoroutineScope(Dispatchers.IO)
+
     suspend fun start() {
         telegram.onMessage {
             if (it.message.senderUserId == telegram.myId) {
-                GlobalScope.launch { // FIXME
+                scope.launch {
                     handleTelegramMessage(it.message)
                 }
             }
@@ -50,13 +54,15 @@ class VkMirror(kodein: Kodein) {
         } ?: return
 
         logger.info("Received message from myself id=${message.id} \"${message.content}\"")
-        if (!dao.isSyncedTelegram(mirrorChat, message.id)) {
-            logger.info("Message {} is not synced", message.id)
+        mutex.withLock {
+            if (!dao.isSyncedTelegram(mirrorChat, message.id)) {
+                logger.info("Message {} is not synced", message.id)
 
-            val ids = vk.sendMessage(mirrorChat.vkPeerId, message)
-            logger.info("Produced vk messages: {}", ids.toString())
+                val ids = vk.sendMessage(mirrorChat.vkPeerId, message)
+                logger.info("Produced vk messages: {}", ids.toString())
 
-            dao.saveVkMessages(mirrorChat, ids, message.id)
+                dao.saveVkMessages(mirrorChat, ids, message.id)
+            }
         }
     }
 
@@ -102,12 +108,16 @@ class VkMirror(kodein: Kodein) {
     }
 
     private suspend fun sendVkMessage(client: TelegramClient, chat: Chat, chatId: Long, message: Message) {
-        logger.info("Sending to chat $chatId")
-        val tgMessage = client.sendMessage(chatId, message.text ?: "")
-        logger.info("Message sent $tgMessage")
+        mutex.withLock {
+            if (!dao.isSyncedVk(chat, message.messageId)) {
+                logger.info("Sending to chat $chatId")
+                val tgMessage = client.sendMessage(chatId, message.text ?: "")
+                logger.info("Message sent $tgMessage")
 
-        dao.saveTelegramMessages(chat, message.messageId, listOf(tgMessage.id))
-        logger.info("Synced message $tgMessage!")
+                dao.saveTelegramMessages(chat, message.messageId, listOf(tgMessage.id))
+                logger.info("Synced message $tgMessage!")
+            }
+        }
     }
 
     private suspend fun getTelegramChat(vkPeerId: Int): Chat? {
@@ -148,9 +158,11 @@ class VkMirror(kodein: Kodein) {
         if (chat.type is TdApi.ChatTypeSupergroup) {
             // TODO Should join every person that is already bound to a bot;
 
-            val photo = vk.downloadConversationImage(vkPeerId)
-            if (photo != null) {
-                telegram.setGroupPhoto(chat.id, photo)
+            scope.launch {
+                val photo = vk.downloadConversationImage(vkPeerId)
+                if (photo != null) {
+                    telegram.setGroupPhoto(chat.id, photo)
+                }
             }
         }
 
@@ -158,16 +170,15 @@ class VkMirror(kodein: Kodein) {
     }
 
     private suspend fun createBotClient(bot: MirrorBot): TelegramClient {
-        return clients.computeIfAbsent(bot) {
+        val client = clients.computeIfAbsent(bot) {
             val client = TelegramClient(botTelegramCredentials(API_ID, API_HASH, bot.token))
 
             client.onMessage {
                 val message = it.message
                 when (val content = message.content) {
                     is TdApi.MessageText -> {
-                        if (content.text.text.equals("/start")) {
-                            // FIXME
-                            GlobalScope.launch {
+                        if (content.text.text == "/start") {
+                            scope.launch {
                                 // TODO Log errors ?
                                 client.deleteMessage(message.chatId, true, message.id)
                             }
@@ -178,6 +189,9 @@ class VkMirror(kodein: Kodein) {
 
             client
         }
+
+        client.start()
+        return client
     }
 
 

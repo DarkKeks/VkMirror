@@ -21,6 +21,7 @@ class TdClient(val updateHandler: (TdApi.Object) -> Unit,
                val exceptionHandler: (Throwable) -> Unit) {
 
     private val clientId: Long
+
     private var stopped = false
 
     private val requests = ConcurrentHashMap<Long, CompletableDeferred<TdApi.Object>>()
@@ -33,13 +34,16 @@ class TdClient(val updateHandler: (TdApi.Object) -> Unit,
     private var isClientDestroyed = false
     private val queryIdCounter = AtomicLong(1)
 
+    private val thread: Thread
+
     init {
         clientId = createNativeClient()
+        thread = thread(start = false, name = "TdClient thread") {
+            run()
+        }
     }
 
-    fun start() = thread(name = "TdClient thread") {
-        run()
-    }
+    fun start() = thread.start()
 
     private fun run() {
         while (!stopped) {
@@ -61,15 +65,17 @@ class TdClient(val updateHandler: (TdApi.Object) -> Unit,
     /**
      * Sends request returning deferred response
      */
-    suspend fun request(request: TdApi.Function): TdApi.Object = lock.read {
+    suspend fun request(request: TdApi.Function): TdApi.Object {
         val result = CompletableDeferred<TdApi.Object>()
-        if (isClientDestroyed) {
-            result.complete(TdApi.Error(500, "Client is closed"))
-        } else {
-            val requestId = queryIdCounter.getAndIncrement()
-            requests[requestId] = result
-            println("request -- nativeClientSend $requestId \n$request")
-            nativeClientSend(clientId, requestId, request)
+        lock.read {
+            if (isClientDestroyed) {
+                result.complete(TdApi.Error(500, "Client is closed"))
+            } else {
+                val requestId = queryIdCounter.getAndIncrement()
+                requests[requestId] = result
+                println("request -- nativeClientSend $requestId \n$request")
+                nativeClientSend(clientId, requestId, request)
+            }
         }
         return result.await()
     }

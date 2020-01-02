@@ -38,11 +38,17 @@ repositories {
     jcenter()
 }
 
+// TODO Doesn't work with kotlin?
 tasks.withType(JavaExec::class) {
     file("local.env").readLines().filter { it.contains("=") }.forEach {
         val (key, value) = it.split("=", limit = 2)
         environment(key, value)
     }
+}
+
+tasks.withType<KotlinCompile>().all {
+    kotlinOptions.freeCompilerArgs += "-Xuse-experimental=kotlin.Experimental"
+    kotlinOptions.freeCompilerArgs += "-Xuse-experimental=kotlinx.coroutines.ExperimentalCoroutinesApi"
 }
 
 val compileKotlin: KotlinCompile by tasks

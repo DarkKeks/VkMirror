@@ -62,7 +62,7 @@ val kodein = Kodein {
 
 fun main() = runBlocking {
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-        logger.error("Thread {} didn't handler exception", thread, throwable)
+        logger.error("Thread {} didn't handle exception", thread, throwable)
     }
 
     VkMirror(kodein).start()

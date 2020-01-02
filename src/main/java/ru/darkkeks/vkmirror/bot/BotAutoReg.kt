@@ -21,8 +21,8 @@ class BotAutoReg(kodein: Kodein) {
     suspend fun start() {
         client.onMessage {
             val message = it.message
-            println("Received message $message")
             if (message.chatId == botFatherChat.id && message.senderUserId != client.myId) {
+                println("Received message $message")
                 GlobalScope.launch {
                     // FIXME
                     responses.send(message)
@@ -73,7 +73,7 @@ class BotAutoReg(kodein: Kodein) {
      */
     suspend fun setDescription(username: String, description: String) {
         val action = SetDescriptionAction(this, username, description)
-        actions.offer(action)
+        actions.send(action)
         action.callback.await()
     }
 
@@ -84,7 +84,7 @@ class BotAutoReg(kodein: Kodein) {
      */
     suspend fun setName(username: String, name: String) {
         val action = SetNameAction(this, username, name)
-        actions.offer(action)
+        actions.send(action)
         action.callback.await()
     }
 

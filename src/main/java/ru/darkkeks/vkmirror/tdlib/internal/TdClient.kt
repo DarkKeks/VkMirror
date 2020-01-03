@@ -6,7 +6,7 @@ import ru.darkkeks.vkmirror.API_ID
 import ru.darkkeks.vkmirror.PHONE_NUMBER
 import ru.darkkeks.vkmirror.tdlib.userTelegramCredentials
 import ru.darkkeks.vkmirror.util.NativeUtils
-import ru.darkkeks.vkmirror.util.logger
+import ru.darkkeks.vkmirror.util.createLogger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -43,7 +43,13 @@ class TdClient(val updateHandler: (TdApi.Object) -> Unit,
         }
     }
 
-    fun start() = thread.start()
+    fun start() {
+        synchronized(thread) {
+            if (!thread.isAlive) {
+                thread.start()
+            }
+        }
+    }
 
     private fun run() {
         while (!stopped) {
@@ -123,7 +129,7 @@ class TdClient(val updateHandler: (TdApi.Object) -> Unit,
     }
 
     companion object {
-        val logger = logger()
+        val logger = createLogger()
 
         init {
             NativeUtils.loadLibraryFromJar("/libtdjni.so")

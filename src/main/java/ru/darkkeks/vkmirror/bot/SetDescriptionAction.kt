@@ -1,6 +1,6 @@
 package ru.darkkeks.vkmirror.bot
 
-import ru.darkkeks.vkmirror.util.logger
+import ru.darkkeks.vkmirror.util.createLogger
 
 // TODO Extract common class with SetNameAction
 class SetDescriptionAction(autoReg: BotAutoReg,
@@ -27,6 +27,6 @@ class SetDescriptionAction(autoReg: BotAutoReg,
     }
 
     companion object {
-        val logger = logger()
+        val logger = createLogger()
     }
 }

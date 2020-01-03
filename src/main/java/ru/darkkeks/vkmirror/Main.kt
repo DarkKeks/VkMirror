@@ -18,6 +18,9 @@ import org.slf4j.LoggerFactory
 import ru.darkkeks.vkmirror.tdlib.TelegramClient
 import ru.darkkeks.vkmirror.tdlib.userTelegramCredentials
 import ru.darkkeks.vkmirror.util.getEnv
+import ru.darkkeks.vkmirror.vk.MessageReadUpTo
+import ru.darkkeks.vkmirror.vk.UserIsTyping
+import ru.darkkeks.vkmirror.vk.UsersAreTyping
 import ru.darkkeks.vkmirror.vk.VkController
 import ru.darkkeks.vkmirror.vk.`object`.Message
 
@@ -44,6 +47,9 @@ val kodein = Kodein {
     bind<VkApiClient>() with singleton {
         val gson = GsonBuilder().apply {
             registerTypeAdapter(Message::class.java, Message.MessageDeserializer())
+            registerTypeAdapter(UserIsTyping::class.java, UserIsTyping.UserIsTypingDeserializer())
+            registerTypeAdapter(UsersAreTyping::class.java, UsersAreTyping.UsersAreTypingDeserializer())
+            registerTypeAdapter(MessageReadUpTo::class.java, MessageReadUpTo.MessageReadUpToDeserializer())
         }.create()
 
         VkApiClient(HttpTransportClient(), gson, 3)

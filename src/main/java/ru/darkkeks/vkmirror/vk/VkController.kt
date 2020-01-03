@@ -7,8 +7,7 @@ import com.vk.api.sdk.objects.users.Fields
 import org.kodein.di.Kodein
 import org.kodein.di.generic.instance
 import ru.darkkeks.vkmirror.tdlib.internal.TdApi
-import ru.darkkeks.vkmirror.util.logger
-import ru.darkkeks.vkmirror.vk.`object`.Message
+import ru.darkkeks.vkmirror.util.createLogger
 import java.io.FileOutputStream
 import java.net.URL
 import java.nio.channels.Channels
@@ -35,7 +34,7 @@ class VkController(kodein: Kodein) {
         }
     }
 
-    fun runLongPoll(handler: (Message) -> Unit) {
+    fun runLongPoll(handler: UserLongPollListener) {
         val longPoll = UserLongPoll(client, actor, handler)
         try {
             longPoll.run()
@@ -102,7 +101,7 @@ class VkController(kodein: Kodein) {
     }
 
     companion object {
-        val logger = logger()
+        val logger = createLogger()
     }
 
 }

@@ -4,7 +4,7 @@ package ru.darkkeks.vkmirror.tdlib
 import ru.darkkeks.vkmirror.tdlib.internal.TdApi
 import ru.darkkeks.vkmirror.tdlib.internal.TdClient
 import ru.darkkeks.vkmirror.util.EventHandler
-import ru.darkkeks.vkmirror.util.logger
+import ru.darkkeks.vkmirror.util.createLogger
 import java.nio.file.Path
 
 class TelegramClient(credentials: TelegramCredentials) {
@@ -124,8 +124,12 @@ class TelegramClient(credentials: TelegramCredentials) {
         client.request(TdApi.DeleteMessages(chatId, messageIds, revoke))
     }
 
+    suspend fun sendChatAction(telegramId: Long, chatAction: TdApi.ChatAction) {
+        client.request(TdApi.SendChatAction(telegramId, chatAction))
+    }
+
 
     companion object {
-        val logger = logger()
+        val logger = createLogger()
     }
 }

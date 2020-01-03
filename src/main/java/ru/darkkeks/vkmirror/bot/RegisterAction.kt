@@ -1,6 +1,6 @@
 package ru.darkkeks.vkmirror.bot
 
-import ru.darkkeks.vkmirror.util.logger
+import ru.darkkeks.vkmirror.util.createLogger
 
 val ALREADY_TAKEN = "already taken".toRegex()
 val TOKEN = """\d+:\w+""".toRegex()
@@ -36,6 +36,6 @@ class RegisterAction(autoReg: BotAutoReg,
     }
 
     companion object {
-        val logger = logger()
+        val logger = createLogger()
     }
 }

@@ -1,6 +1,6 @@
 package ru.darkkeks.vkmirror.bot
 
-import ru.darkkeks.vkmirror.util.logger
+import ru.darkkeks.vkmirror.util.createLogger
 
 class SetNameAction(autoReg: BotAutoReg,
                     val username: String,
@@ -26,6 +26,6 @@ class SetNameAction(autoReg: BotAutoReg,
     }
 
     companion object {
-        val logger = logger()
+        val logger = createLogger()
     }
 }

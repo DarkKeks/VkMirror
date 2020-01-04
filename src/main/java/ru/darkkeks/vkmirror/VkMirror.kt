@@ -7,6 +7,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.kodein.di.Kodein
 import org.kodein.di.generic.instance
+import org.litote.kmongo.newId
 import ru.darkkeks.vkmirror.bot.MirrorBot
 import ru.darkkeks.vkmirror.bot.START
 import ru.darkkeks.vkmirror.tdlib.TelegramClient
@@ -30,11 +31,37 @@ class VkMirror(kodein: Kodein) {
     private val scope = CoroutineScope(Dispatchers.IO)
 
     suspend fun start() {
-        telegram.onMessage {
-            if (it.message.senderUserId == telegram.myId) {
-                scope.launch {
+        telegram.subscribe<TdApi.UpdateNewMessage> {
+            logger.info("Incoming message from chat ${it.message.chatId} with id ${it.message.id}")
+            val chat = telegram.getChat(it.message.chatId) ?: return@subscribe
+            scope.launch {
+                val id = when (val type = chat.type) {
+                    is TdApi.ChatTypePrivate -> type.userId
+                    is TdApi.ChatTypeSupergroup -> type.supergroupId
+                    else -> return@launch
+                }
+                linkTelegramId(id, telegram.myId, it.message)
+            }
+            scope.launch {
+                if (it.message.senderUserId == telegram.myId) {
                     handleTelegramMessage(it.message)
                 }
+            }
+        }
+
+        telegram.subscribe<TdApi.UpdateChatReadInbox> {
+            logger.info("Received UpdateChatReadInbox in chat ${it.chatId} with last message ${it.lastReadInboxMessageId}")
+            scope.launch {
+                val chat = telegramChatIdToMirrorChat(it.chatId) ?: return@launch
+                val message = telegram.getMessage(it.chatId, it.lastReadInboxMessageId)
+                logger.info("UpdateChatReadInbox message sender is ${message.senderUserId}")
+                val messageIds = dao.getMessageLinks(chat._id, telegram.myId, it.lastReadInboxMessageId)
+                logger.info("UpdateChatReadInbox known message ids are $messageIds")
+                val idFromBotPerspective = messageIds[message.senderUserId] ?: return@launch
+                logger.info("UpdateChatReadInbox id from bots perspective is $idFromBotPerspective")
+                val vkMessageId = dao.getSyncedMessage(chat._id, idFromBotPerspective)?.vkId ?: return@launch
+                logger.info("UpdateChatReadInbox sending vk api request with peerId ${chat.vkPeerId} and message id $vkMessageId")
+                vk.markAsRead(chat.vkPeerId, vkMessageId)
             }
         }
 
@@ -42,14 +69,25 @@ class VkMirror(kodein: Kodein) {
         vk.runLongPoll(VkListener())
     }
 
-    private suspend fun handleTelegramMessage(message: TdApi.Message) {
-        val chat = telegram.getChat(message.chatId) ?: return
+    private suspend fun linkTelegramId(chatOrSupergroupId: Int, userId: Int, message: TdApi.Message) {
+        val chat = dao.getChatByTelegramId(chatOrSupergroupId) ?: return
+        logger.info("Adding message-id link for chat ${chat.vkPeerId} for user $userId, messageId ${message.id}")
+        val link = MessageIdLink(newId(), chat._id, message.content.toString(), message.date.toLong(), userId, message.id)
+        dao.saveMessageIdLink(link)
+    }
 
-        val mirrorChat = when (val type = chat.type) {
+    private suspend fun telegramChatIdToMirrorChat(chatId: Long): Chat? {
+        val chat = telegram.getChat(chatId) ?: return null
+
+        return when (val type = chat.type) {
             is TdApi.ChatTypePrivate -> dao.getChatByTelegramId(type.userId)
             is TdApi.ChatTypeSupergroup -> dao.getChatByTelegramId(type.supergroupId)
-            else -> return
-        } ?: return
+            else -> null
+        }
+    }
+
+    private suspend fun handleTelegramMessage(message: TdApi.Message) {
+        val mirrorChat = telegramChatIdToMirrorChat(message.chatId) ?: return
 
         logger.info("Received message from myself id=${message.id} \"${message.content}\"")
         mutex.withLock {
@@ -70,9 +108,8 @@ class VkMirror(kodein: Kodein) {
                 logger.info("Sending to chat $chatId")
                 val tgMessage = client.sendMessage(chatId, message.text ?: "")
                 logger.info("Message sent $tgMessage")
-
+                linkTelegramId(chat.telegramId, client.myId, tgMessage)
                 dao.saveTelegramMessages(chat, message.messageId, listOf(tgMessage.id))
-                logger.info("Synced message $tgMessage!")
             }
         }
     }
@@ -128,28 +165,37 @@ class VkMirror(kodein: Kodein) {
     }
 
     private suspend fun createBotClient(bot: MirrorBot): TelegramClient {
-        val client = clients.computeIfAbsent(bot) {
-            val client = TelegramClient(botTelegramCredentials(API_ID, API_HASH, bot.token))
+        return clients.computeIfAbsent(bot) {
+            TelegramClient(botTelegramCredentials(API_ID, API_HASH, bot.token)).also { client ->
+                client.subscribe<TdApi.UpdateNewMessage> { update ->
+                    val message = update.message
+                    logger.info("Bot incoming message from chat ${message.chatId} with id ${message.id}")
 
-            client.onMessage {
-                val message = it.message
-                when (val content = message.content) {
-                    is TdApi.MessageText -> {
-                        if (content.text.text == "/start") {
-                            scope.launch {
-                                // TODO Log errors ?
-                                client.deleteMessage(message.chatId, true, message.id)
+                    scope.launch {
+                        val chat = client.getChat(message.chatId) ?: return@launch
+                        val id = when (val type = chat.type) {
+                            is TdApi.ChatTypePrivate -> client.myId
+                            is TdApi.ChatTypeSupergroup -> type.supergroupId
+                            else -> return@launch
+                        }
+                        linkTelegramId(id, client.myId, message)
+                    }
+
+                    when (val content = message.content) {
+                        is TdApi.MessageText -> {
+                            if (content.text.text == "/start") {
+                                scope.launch {
+                                    // TODO Log errors ?
+                                    client.deleteMessage(message.chatId, true, message.id)
+                                }
                             }
                         }
                     }
                 }
             }
-
-            client
+        }.apply {
+            start()
         }
-
-        client.start()
-        return client
     }
 
     inner class VkListener : UserLongPollListener {
@@ -177,7 +223,7 @@ class VkMirror(kodein: Kodein) {
                         sendVkMessage(client, chat, recipient.toLong(), message)
                     }
                     ChatType.GROUP -> {
-                        val groupId = chat.telegramId.toInt()
+                        val groupId = chat.telegramId
                         val group = client.groupById(groupId)
 
                         if (group == null) {
@@ -198,12 +244,15 @@ class VkMirror(kodein: Kodein) {
         }
 
         override fun editMessage(editedMessage: Message) {
+
         }
 
         override fun readUpToInbound(event: MessageReadUpTo) {
+            // https://quire.io/w/HSE-24/189#comment-OENM7zHkvQeHWdfmQktRfva~
         }
 
         override fun readUpToOutbound(event: MessageReadUpTo) {
+            // https://quire.io/w/HSE-24/189#comment-OENM7zHkvQeHWdfmQktRfva~
         }
 
         override fun userIsTyping(userId: Int) {

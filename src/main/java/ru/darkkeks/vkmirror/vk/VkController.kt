@@ -52,6 +52,10 @@ class VkController(kodein: Kodein) {
         }
     }
 
+    fun markAsRead(peerId: Int, messageId: Int) {
+        client.messages().markAsRead(actor).peerId(peerId).startMessageId(messageId).execute()
+    }
+
     fun downloadConversationImage(peerId: Int): Path? {
         val conversations = MyGetConversationsQuery(client, actor, peerId).execute()
         val conversation = conversations.items[0]

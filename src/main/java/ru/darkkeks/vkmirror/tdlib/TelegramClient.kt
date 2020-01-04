@@ -1,17 +1,22 @@
 package ru.darkkeks.vkmirror.tdlib
 
 
+import kotlinx.coroutines.CompletableDeferred
 import ru.darkkeks.vkmirror.tdlib.internal.TdApi
 import ru.darkkeks.vkmirror.tdlib.internal.TdClient
 import ru.darkkeks.vkmirror.util.EventHandler
 import ru.darkkeks.vkmirror.util.createLogger
 import java.nio.file.Path
+import kotlin.reflect.KClass
 
 class TelegramClient(credentials: TelegramCredentials) {
 
     private val updateHandler = EventHandler<TdApi.Object>()
 
-    private val client = TdClient(updateHandler::onMessage, ::handleException)
+    private val client = TdClient({
+//        println(it)
+        updateHandler.onMessage(it)
+    }, ::handleException)
 
     private val authHandler = AuthHandler(credentials, client)
 
@@ -19,6 +24,8 @@ class TelegramClient(credentials: TelegramCredentials) {
 
     private val chats = mutableMapOf<Long, TdApi.Chat>()
     private val supergroups = mutableMapOf<Int, TdApi.Supergroup>()
+
+    private val pendingMessages = mutableMapOf<Long, CompletableDeferred<TdApi.Message>>()
 
     init {
         updateHandler.apply {
@@ -39,6 +46,16 @@ class TelegramClient(credentials: TelegramCredentials) {
             addHandler(TdApi.UpdateSupergroup::class) {
                 supergroups[it.supergroup.id] = it.supergroup
             }
+
+            addHandler(TdApi.UpdateMessageSendSucceeded::class) {
+                val deferred = pendingMessages.remove(it.oldMessageId) ?: return@addHandler
+                deferred.complete(it.message)
+            }
+
+            addHandler(TdApi.UpdateMessageSendFailed::class) {
+                val deferred = pendingMessages.remove(it.oldMessageId) ?: return@addHandler
+                deferred.completeExceptionally(TelegramException(it.errorCode, it.errorMessage))
+            }
         }
     }
 
@@ -57,9 +74,11 @@ class TelegramClient(credentials: TelegramCredentials) {
 
     fun getChat(id: Long) = chats[id]
 
-    fun onMessage(handler: (TdApi.UpdateNewMessage) -> Unit) {
-        updateHandler.addHandler(TdApi.UpdateNewMessage::class, handler)
-    }
+    inline fun <reified T : TdApi.Object> subscribe(noinline handler: (T) -> Unit) =
+            subscribe(T::class, handler)
+
+    fun <T : TdApi.Object> subscribe(event: KClass<T>, handler: (T) -> Unit) =
+            updateHandler.addHandler(event, handler)
 
     suspend fun setGroupPhoto(chatId: Long, file: Path) {
         val inputFile = TdApi.InputFileLocal(file.toAbsolutePath().toString())
@@ -106,7 +125,10 @@ class TelegramClient(credentials: TelegramCredentials) {
     suspend fun sendMessage(chatId: Long, text: String): TdApi.Message {
         val message = TdApi.InputMessageText(TdApi.FormattedText(text, null), false, true)
         val request = TdApi.SendMessage(chatId, 0, true, true, null, message)
-        return client.request(request) as TdApi.Message
+        val temporaryMessage = client.request(request) as TdApi.Message
+        val deferred = CompletableDeferred<TdApi.Message>()
+        pendingMessages[temporaryMessage.id] = deferred
+        return deferred.await()
     }
 
     suspend fun groupById(supergroupId: Int): TdApi.Chat? {
@@ -126,6 +148,10 @@ class TelegramClient(credentials: TelegramCredentials) {
 
     suspend fun sendChatAction(telegramId: Long, chatAction: TdApi.ChatAction) {
         client.request(TdApi.SendChatAction(telegramId, chatAction))
+    }
+
+    suspend fun getMessage(chatId: Long, messageId: Long): TdApi.Message {
+        return client.request(TdApi.GetMessage(chatId, messageId)) as TdApi.Message
     }
 
 

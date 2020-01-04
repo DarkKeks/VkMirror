@@ -9,6 +9,7 @@ logs
 tdlib.log
 
 accounts
+Test.kt
 
 /src/main/jni/bin
 /src/main/jni/td

@@ -19,7 +19,7 @@ class BotAutoReg(kodein: Kodein) {
     private lateinit var botFatherChat: TdApi.Chat
 
     suspend fun start() {
-        client.onMessage {
+        client.subscribe<TdApi.UpdateNewMessage> {
             val message = it.message
             if (message.chatId == botFatherChat.id && message.senderUserId != client.myId) {
                 println("Received message $message")

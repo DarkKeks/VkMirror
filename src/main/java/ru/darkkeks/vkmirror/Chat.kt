@@ -10,17 +10,13 @@ import ru.darkkeks.vkmirror.vk.ChatType
  */
 data class Chat(val _id: Id<Chat>, var vkPeerId: Int, val telegramId: Int, val type: ChatType) {
 
-    // TODO JvmStatic is not needed
     companion object {
-        @JvmStatic
         fun privateChat(vkPeerId: Int, botId: Int): Chat {
             return Chat(newId(), vkPeerId, botId, ChatType.PRIVATE)
         }
 
-        @JvmStatic
         fun groupChat(vkPeerId: Int, telegramChatId: Int): Chat {
             return Chat(newId(), vkPeerId, telegramChatId, ChatType.GROUP)
         }
     }
-
 }

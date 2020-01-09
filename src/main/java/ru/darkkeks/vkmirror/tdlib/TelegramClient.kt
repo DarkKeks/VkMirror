@@ -154,8 +154,11 @@ class TelegramClient(credentials: TelegramCredentials) {
         return client.request(TdApi.GetMessage(chatId, messageId)) as TdApi.Message
     }
 
+    suspend fun readMessages(chatId: Long, vararg messageIds: Long, forceRead: Boolean = false) {
+        client.request(TdApi.ViewMessages(chatId, messageIds, forceRead))
+    }
 
     companion object {
-        val logger = createLogger()
+        val logger = createLogger<TelegramClient>()
     }
 }

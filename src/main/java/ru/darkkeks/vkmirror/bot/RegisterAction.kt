@@ -36,6 +36,6 @@ class RegisterAction(autoReg: BotAutoReg,
     }
 
     companion object {
-        val logger = createLogger()
+        val logger = createLogger<RegisterAction>()
     }
 }

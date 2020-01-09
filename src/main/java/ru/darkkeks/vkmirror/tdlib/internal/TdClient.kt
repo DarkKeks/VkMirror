@@ -129,7 +129,7 @@ class TdClient(val updateHandler: (TdApi.Object) -> Unit,
     }
 
     companion object {
-        val logger = createLogger()
+        val logger = createLogger<TdClient>()
 
         init {
             NativeUtils.loadLibraryFromJar("/libtdjni.so")

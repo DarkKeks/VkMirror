@@ -3,12 +3,12 @@ package ru.darkkeks.vkmirror.bot
 import ru.darkkeks.vkmirror.util.createLogger
 
 // TODO Extract common class with SetNameAction
-class SetDescriptionAction(autoReg: BotAutoReg,
-                           val username: String,
-                           val description: String) : BotFatherAction<Unit>(autoReg) {
+class SetAboutAction(autoReg: BotAutoReg,
+                     val username: String,
+                     val about: String) : BotFatherAction<Unit>(autoReg) {
 
     override suspend fun execute() {
-        val newBot = autoReg.executeCommand(SET_DESCRIPTION)
+        val newBot = autoReg.executeCommand(SET_ABOUT)
 
         val timeout = getTimeout(newBot)
         if (timeout != null) {
@@ -22,11 +22,11 @@ class SetDescriptionAction(autoReg: BotAutoReg,
             callback.completeExceptionally(IllegalStateException("Invalid username $username"))
         }
 
-        autoReg.executeCommand(description)
+        autoReg.executeCommand(about)
         callback.complete(Unit)
     }
 
     companion object {
-        val logger = createLogger()
+        val logger = createLogger<SetAboutAction>()
     }
 }

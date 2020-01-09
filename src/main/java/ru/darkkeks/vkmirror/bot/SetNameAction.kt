@@ -26,6 +26,6 @@ class SetNameAction(autoReg: BotAutoReg,
     }
 
     companion object {
-        val logger = createLogger()
+        val logger = createLogger<SetNameAction>()
     }
 }

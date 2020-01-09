@@ -105,7 +105,7 @@ class VkController(kodein: Kodein) {
     }
 
     companion object {
-        val logger = createLogger()
+        val logger = createLogger<VkController>()
     }
 
 }

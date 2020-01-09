@@ -4,7 +4,7 @@ package ru.darkkeks.vkmirror.bot
 const val BOT_FATHER = "BotFather"
 const val START = "/start"
 const val NEW_BOT = "/newbot"
-const val SET_DESCRIPTION = "/setdescription"
+const val SET_ABOUT = "/setabouttext"
 const val SET_NAME = "/setname"
 
 

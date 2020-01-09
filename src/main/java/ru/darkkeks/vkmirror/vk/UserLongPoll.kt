@@ -95,7 +95,7 @@ class UserLongPoll(private var client: VkApiClient,
     }
 
     companion object {
-        val logger = createLogger()
+        val logger = createLogger<UserLongPoll>()
     }
 }
 

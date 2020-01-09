@@ -67,12 +67,12 @@ class BotAutoReg(kodein: Kodein) {
     }
 
     /**
-     * Sets bot description
+     * Sets bot about text
      * @param username Bot username (with @)
-     * @param description New description
+     * @param about New about text
      */
-    suspend fun setDescription(username: String, description: String) {
-        val action = SetDescriptionAction(this, username, description)
+    suspend fun setAbout(username: String, about: String) {
+        val action = SetAboutAction(this, username, about)
         actions.send(action)
         action.callback.await()
     }

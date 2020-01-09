@@ -42,16 +42,24 @@ class VkMirrorDao(kodein: Kodein) {
                 SyncedMessage::vkId eq messageId)) > 0
     }
 
-    suspend fun saveTelegramMessages(chat: Chat, vkId: Int, telegramIds: List<Long>) {
+    suspend fun saveTelegramMessages(chat: Chat, vkId: Int, telegramIds: List<Long>, sender: Int) {
         messages.bulkWrite(telegramIds.map {
-            insertOne(SyncedMessage(newId(), chat._id, vkId, it, MessageDirection.VK_TO_TELEGRAM))
+            insertOne(SyncedMessage(newId(), chat._id, vkId, it, sender, MessageDirection.VK_TO_TELEGRAM))
         })
     }
 
     suspend fun saveVkMessages(chat: Chat, vkIds: List<Int>, telegramId: Long) {
         messages.bulkWrite(vkIds.map {
-            insertOne(SyncedMessage(newId(), chat._id, it, telegramId, MessageDirection.TELEGRAM_TO_VK))
+            insertOne(SyncedMessage(newId(), chat._id, it, telegramId, -1, MessageDirection.TELEGRAM_TO_VK))
         })
+    }
+
+    suspend fun getSyncedMessageByTelegramId(chat: Id<Chat>, telegramMessageId: Long): SyncedMessage? {
+        return messages.findOne(and(SyncedMessage::chat eq chat, SyncedMessage::telegramId eq telegramMessageId))
+    }
+
+    suspend fun getSyncedMessageByVkId(chat: Id<Chat>, vkMessageId: Int): SyncedMessage? {
+        return messages.findOne(and(SyncedMessage::chat eq chat, SyncedMessage::vkId eq vkMessageId))
     }
 
     suspend fun getBotByVkId(vkId: Int): MirrorBot? {
@@ -89,9 +97,5 @@ class VkMirrorDao(kodein: Kodein) {
                     MessageIdLink::content eq originalLink.content
             )).toList().associate { it.userId to it.messageId }
         }
-    }
-
-    suspend fun getSyncedMessage(chat: Id<Chat>, telegramMessageId: Long): SyncedMessage? {
-        return messages.findOne(and(SyncedMessage::chat eq chat, SyncedMessage::telegramId eq telegramMessageId))
     }
 }

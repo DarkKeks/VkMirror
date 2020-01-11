@@ -18,10 +18,7 @@ import org.slf4j.LoggerFactory
 import ru.darkkeks.vkmirror.tdlib.TelegramClient
 import ru.darkkeks.vkmirror.tdlib.userTelegramCredentials
 import ru.darkkeks.vkmirror.util.getEnv
-import ru.darkkeks.vkmirror.vk.MessageReadUpTo
-import ru.darkkeks.vkmirror.vk.UserIsTyping
-import ru.darkkeks.vkmirror.vk.UsersAreTyping
-import ru.darkkeks.vkmirror.vk.VkController
+import ru.darkkeks.vkmirror.vk.*
 import ru.darkkeks.vkmirror.vk.`object`.Message
 
 val USER_ID = getEnv("USER_ID").toInt()

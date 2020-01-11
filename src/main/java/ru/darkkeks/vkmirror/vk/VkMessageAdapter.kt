@@ -8,13 +8,14 @@ import ru.darkkeks.vkmirror.tdlib.internal.TdApi
 import ru.darkkeks.vkmirror.util.buildList
 import ru.darkkeks.vkmirror.util.createLogger
 
-class VkMessageAdapter(kodein: Kodein,
-                       val vk: VkController,
-                       val queryProvider: () -> MessagesSendQuery) {
+class VkMessageAdapter(val vk: VkController, kodein: Kodein) {
 
     val telegram: TelegramClient by kodein.instance()
 
-    suspend fun adapt(peerId: Int, message: TdApi.Message) = buildList<MessagesSendQuery> {
+    suspend fun adapt(peerId: Int,
+                      message: TdApi.Message,
+                      queryProvider: () -> MessagesSendQuery) = buildList<MessagesSendQuery> {
+
         when (val content = message.content) {
             is TdApi.MessageText -> {
                 val text = content.text.text

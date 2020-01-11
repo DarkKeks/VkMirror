@@ -86,26 +86,21 @@ class VkMirror(kodein: Kodein) {
 
     private suspend fun handleTelegramMessage(message: TdApi.Message) {
         val mirrorChat = telegramChatIdToMirrorChat(message.chatId) ?: return
-
         logger.info("Received message from myself id=${message.id} \"${message.content}\"")
-        getChatLock(mirrorChat).withLock {
-            if (!dao.isSyncedTelegram(mirrorChat, message.id)) {
-                logger.info("Message {} is not synced", message.id)
 
-                val ids = vk.sendMessage(mirrorChat.vkPeerId, message)
-                logger.info("Produced vk messages: {}", ids.toString())
+        if (!dao.isSyncedTelegram(mirrorChat, message.id)) {
+            val vkMessages = vk.adaptMessage(mirrorChat.vkPeerId, message)
+            getChatLock(mirrorChat).withLock {
+                if (!dao.isSyncedTelegram(mirrorChat, message.id)) {
+                    logger.info("Message {} is not synced", message.id)
 
-                dao.saveVkMessages(mirrorChat, ids, message.id)
+                    val ids = vk.sendMessages(vkMessages)
+                    logger.info("Produced vk messages: {}", ids.toString())
+
+                    dao.saveVkMessages(mirrorChat, ids, message.id)
+                }
             }
         }
-    }
-
-    private suspend fun sendVkMessage(client: TelegramClient, chat: Chat, chatId: Long, message: Message) {
-        logger.info("Sending to chat $chatId")
-        val tgMessage = client.sendMessage(chatId, message.text ?: "")
-        logger.info("Message sent $tgMessage")
-        linkTelegramId(chat.telegramId, client.myId, tgMessage)
-        dao.saveTelegramMessages(chat, message.messageId, listOf(tgMessage.id), client.myId)
     }
 
     private suspend fun getTelegramChat(vkPeerId: Int): Chat? {
@@ -197,6 +192,15 @@ class VkMirror(kodein: Kodein) {
     }
 
     inner class VkListener : UserLongPollListener {
+
+        private suspend fun sendVkMessage(client: TelegramClient, chat: Chat, chatId: Long, message: Message) {
+            logger.info("Sending to chat $chatId")
+            val tgMessage = client.sendMessage(chatId, message.text ?: "")
+            logger.info("Message sent $tgMessage")
+            linkTelegramId(chat.telegramId, client.myId, tgMessage)
+            dao.saveTelegramMessages(chat, message.messageId, listOf(tgMessage.id), client.myId)
+        }
+
         override fun newMessage(message: Message) {
             scope.launch {
                 logger.info("New message from ${message.from} -> id=${message.messageId} \"${message.text}\"")
@@ -252,7 +256,7 @@ class VkMirror(kodein: Kodein) {
                     val message = dao.getSyncedMessageByVkId(chat._id, event.messageId) ?: return@launch
                     val messageIds = dao.getMessageLinks(chat._id, message.sender, message.telegramId)
                     val messageIdFromByPerspective = messageIds[telegram.myId] ?: return@launch
-                    val telegramChatId: Long = when (chat.type) {
+                    val telegramChatId = when (chat.type) {
                         ChatType.PRIVATE -> chat.telegramId.toLong()
                         ChatType.GROUP -> {
                             val supergroup = telegram.groupById(chat.telegramId) ?: return@launch

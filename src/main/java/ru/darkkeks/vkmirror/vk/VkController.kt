@@ -4,6 +4,7 @@ import com.vk.api.sdk.client.VkApiClient
 import com.vk.api.sdk.client.actors.UserActor
 import com.vk.api.sdk.exceptions.ApiException
 import com.vk.api.sdk.objects.users.Fields
+import com.vk.api.sdk.queries.messages.MessagesSendQuery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -22,12 +23,10 @@ import kotlin.random.Random
 
 class VkController(kodein: Kodein) {
 
-    val client: VkApiClient by kodein.instance()
-    val actor: UserActor by kodein.instance()
+    private val client: VkApiClient by kodein.instance()
+    private val actor: UserActor by kodein.instance()
 
-    private val messageAdapter = VkMessageAdapter(kodein, this) {
-        client.messages().send(actor)
-    }
+    private val messageAdapter = VkMessageAdapter(this, kodein)
 
     suspend fun runLongPoll(handler: UserLongPollListener) {
         val longPoll = UserLongPoll(client, actor, handler)
@@ -38,15 +37,19 @@ class VkController(kodein: Kodein) {
         }
     }
 
+    suspend fun adaptMessage(peerId: Int, message: TdApi.Message): List<MessagesSendQuery> {
+        return messageAdapter.adapt(peerId, message) {
+            client.messages().send(actor).peerId(peerId)
+        }
+    }
+
     /**
      * @return list of produced messages
      */
-    suspend fun sendMessage(peerId: Int, message: TdApi.Message): List<Int> {
+    suspend fun sendMessages(messages: List<MessagesSendQuery>): List<Int> {
         return coroutineScope {
-            messageAdapter.adapt(peerId, message).map {
-                async {
-                    it.peerId(peerId).randomId(Random.nextInt()).executeSuspending()
-                }
+            messages.map {
+                async { it.randomId(Random.nextInt()).executeSuspending() }
             }.map {
                 it.await()
             }

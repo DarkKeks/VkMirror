@@ -43,12 +43,14 @@ class VkMirrorDao(kodein: Kodein) {
     }
 
     suspend fun saveTelegramMessages(chat: Chat, vkId: Int, telegramIds: List<Long>, sender: Int) {
+        if (telegramIds.isEmpty()) return
         messages.bulkWrite(telegramIds.map {
             insertOne(SyncedMessage(newId(), chat._id, vkId, it, sender, MessageDirection.VK_TO_TELEGRAM))
         })
     }
 
     suspend fun saveVkMessages(chat: Chat, vkIds: List<Int>, telegramId: Long) {
+        if (vkIds.isEmpty()) return
         messages.bulkWrite(vkIds.map {
             insertOne(SyncedMessage(newId(), chat._id, it, telegramId, -1, MessageDirection.TELEGRAM_TO_VK))
         })

@@ -16,3 +16,21 @@ fun prompt(message: String): String {
 fun getEnv(name: String): String {
     return System.getenv(name) ?: throw IllegalStateException("No env variable $name")
 }
+
+class ListBuilder<T> {
+    private val result = mutableListOf<T>()
+
+    fun add(vararg values: T) {
+        values.forEach {
+            result.add(it)
+        }
+    }
+
+    fun build() = result.toList()
+}
+
+inline fun <T> buildList(block: ListBuilder<T>.() -> Unit): List<T> {
+    val builder = ListBuilder<T>()
+    builder.block()
+    return builder.build()
+}

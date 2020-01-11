@@ -2,6 +2,9 @@ package ru.darkkeks.vkmirror.vk
 
 import com.vk.api.sdk.callback.longpoll.LongPollQueryBuilder
 import com.vk.api.sdk.client.AbstractQueryBuilder
+import com.vk.api.sdk.client.ApiRequest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 
 const val MULTICHAT_BASE = 2_000_000_000
@@ -36,6 +39,7 @@ fun getChatUrl(peerId: Int): String {
     return "https://vk.com/im?sel=${peerId}"
 }
 
+suspend fun <T> ApiRequest<T>.executeSuspending(): T = withContext(Dispatchers.IO) { execute() }
 
 fun <T, R> LongPollQueryBuilder<T, R>.unsafeParameter(key: String, value: String): T = unsafeParam(key, value)
 

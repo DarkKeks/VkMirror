@@ -97,7 +97,7 @@ class TelegramClient(credentials: TelegramCredentials) {
     }
 
     suspend fun createSupergroup(title: String, description: String): TdApi.Chat {
-        val request = TdApi.CreateNewSupergroupChat(title, false, description)
+        val request = TdApi.CreateNewSupergroupChat(title, false, description, TdApi.ChatLocation())
         return when (val response = client.request(request)) {
             is TdApi.Error -> {
                 logger.error("Error creating channel {}: {}", title, response)
@@ -124,7 +124,7 @@ class TelegramClient(credentials: TelegramCredentials) {
 
     suspend fun sendMessage(chatId: Long, text: String): TdApi.Message {
         val message = TdApi.InputMessageText(TdApi.FormattedText(text, null), false, true)
-        val request = TdApi.SendMessage(chatId, 0, true, true, null, message)
+        val request = TdApi.SendMessage(chatId, 0, TdApi.SendMessageOptions(false, false, null), null, message)
         val temporaryMessage = client.request(request) as TdApi.Message
         val deferred = CompletableDeferred<TdApi.Message>()
         pendingMessages[temporaryMessage.id] = deferred
@@ -156,6 +156,15 @@ class TelegramClient(credentials: TelegramCredentials) {
 
     suspend fun readMessages(chatId: Long, vararg messageIds: Long, forceRead: Boolean = false) {
         client.request(TdApi.ViewMessages(chatId, messageIds, forceRead))
+    }
+
+    suspend fun downloadFile(file: TdApi.File): TdApi.File {
+        if (file.local.isDownloadingCompleted) {
+            return file
+        } else {
+            val response = client.request(TdApi.DownloadFile(file.id, 1, 0, 0, true))
+            return response as TdApi.File
+        }
     }
 
     companion object {

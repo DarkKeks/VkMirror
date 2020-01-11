@@ -28,7 +28,7 @@ class UserLongPoll(private var client: VkApiClient,
                    private val actor: UserActor,
                    private val listener: UserLongPollListener) {
 
-    fun run() {
+    suspend fun run() {
         var longPollServer = getLongPollServer()
         var lastTimeStamp = longPollServer.ts
 
@@ -42,7 +42,7 @@ class UserLongPoll(private var client: VkApiClient,
                         .mode(2 or 8 or 64)
                         .version(3)
                         .waitTime(WAIT_TIME_SECONDS)
-                        .execute()
+                        .executeSuspending()
 
                 lastTimeStamp = events.ts
                 events.updates.forEach { parse(it) }
@@ -52,10 +52,10 @@ class UserLongPoll(private var client: VkApiClient,
         }
     }
 
-    private fun getLongPollServer(): LongpollParams {
+    private suspend fun getLongPollServer(): LongpollParams {
         return client.messages().getLongPollServer(actor)
                 .lpVersion(3)
-                .execute()
+                .executeSuspending()
     }
 
     /**

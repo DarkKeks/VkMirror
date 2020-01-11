@@ -27,7 +27,7 @@ class AuthHandler(val credentials: TelegramCredentials, val client: TdClient) {
             }
 
             addHandler(TdApi.AuthorizationStateWaitCode::class) {
-                client.send(TdApi.CheckAuthenticationCode(prompt("Please enter authentication code"), "", ""))
+                client.send(TdApi.CheckAuthenticationCode(prompt("Please enter authentication code")))
             }
 
             addHandler(TdApi.AuthorizationStateWaitPassword::class) {

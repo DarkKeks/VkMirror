@@ -1,7 +1,6 @@
 package ru.darkkeks.vkmirror
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -17,6 +16,7 @@ import ru.darkkeks.vkmirror.tdlib.internal.TdApi
 import ru.darkkeks.vkmirror.util.createLogger
 import ru.darkkeks.vkmirror.vk.*
 import ru.darkkeks.vkmirror.vk.`object`.Message
+import java.util.concurrent.ConcurrentHashMap
 
 class VkMirror(kodein: Kodein) {
 
@@ -25,29 +25,19 @@ class VkMirror(kodein: Kodein) {
 
     private val dao = VkMirrorDao(kodein)
 
-    private val clients = mutableMapOf<MirrorBot, TelegramClient>()
+    private val clients = ConcurrentHashMap<MirrorBot, TelegramClient>()
 
-    private val chatLocks = mutableMapOf<Id<Chat>, Mutex>()
+    private val chatLocks = ConcurrentHashMap<Id<Chat>, Mutex>()
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = GlobalScope // FIXME: Global вместо CoroutineScope(), потому что я не хочу чтобы он закрывался от любого исключения....
 
     suspend fun start() {
         telegram.subscribe<TdApi.UpdateNewMessage> {
-            logger.info("Incoming message from chat ${it.message.chatId} with id ${it.message.id}")
-            val chat = telegram.getChat(it.message.chatId) ?: return@subscribe
-            scope.launch {
-                val id = when (val type = chat.type) {
-                    is TdApi.ChatTypePrivate -> type.userId
-                    is TdApi.ChatTypeSupergroup -> type.supergroupId
-                    else -> return@launch
-                }
-                linkTelegramId(id, telegram.myId, it.message)
-            }
-            scope.launch {
-                if (it.message.senderUserId == telegram.myId) {
-                    handleTelegramMessage(it.message)
-                }
-            }
+            handleTelegramMessage(it.message)
+        }
+
+        telegram.subscribe<TdApi.UpdateMessageSendSucceeded> {
+            handleTelegramMessage(it.message)
         }
 
         telegram.subscribe<TdApi.UpdateChatReadInbox> {
@@ -84,20 +74,37 @@ class VkMirror(kodein: Kodein) {
         }
     }
 
-    private suspend fun handleTelegramMessage(message: TdApi.Message) {
-        val mirrorChat = telegramChatIdToMirrorChat(message.chatId) ?: return
-        logger.info("Received message from myself id=${message.id} \"${message.content}\"")
+    private fun handleTelegramMessage(message: TdApi.Message) {
+        if (message.sendingState != null) return
 
-        if (!dao.isSyncedTelegram(mirrorChat, message.id)) {
-            val vkMessages = vk.adaptMessage(mirrorChat.vkPeerId, message)
-            getChatLock(mirrorChat).withLock {
-                if (!dao.isSyncedTelegram(mirrorChat, message.id)) {
-                    logger.info("Message {} is not synced", message.id)
+        logger.info("Incoming message from chat ${message.chatId} with id ${message.id}")
+        scope.launch {
+            val chat = telegram.getChat(message.chatId) ?: return@launch
+            val id = when (val type = chat.type) {
+                is TdApi.ChatTypePrivate -> type.userId
+                is TdApi.ChatTypeSupergroup -> type.supergroupId
+                else -> return@launch
+            }
+            linkTelegramId(id, telegram.myId, message)
+        }
 
-                    val ids = vk.sendMessages(vkMessages)
-                    logger.info("Produced vk messages: {}", ids.toString())
+        if (message.senderUserId != telegram.myId) return
 
-                    dao.saveVkMessages(mirrorChat, ids, message.id)
+        scope.launch {
+            val mirrorChat = telegramChatIdToMirrorChat(message.chatId) ?: return@launch
+            logger.info("Received message from myself id=${message.id} \"${message.content}\"")
+
+            if (!dao.isSyncedTelegram(mirrorChat, message.id)) {
+                val vkMessages = vk.adaptMessage(mirrorChat.vkPeerId, message)
+                getChatLock(mirrorChat).withLock {
+                    if (!dao.isSyncedTelegram(mirrorChat, message.id)) {
+                        logger.info("Message {} is not synced", message.id)
+
+                        val ids = vk.sendMessages(vkMessages)
+                        logger.info("Produced vk messages: {}", ids.toString())
+
+                        dao.saveVkMessages(mirrorChat, ids, message.id)
+                    }
                 }
             }
         }
@@ -207,40 +214,48 @@ class VkMirror(kodein: Kodein) {
 
                 val chat = getTelegramChat(message.peerId) ?: return@launch
 
-                getChatLock(chat).withLock {
-                    if (dao.isSyncedVk(chat, message.messageId)) return@launch
 
-                    val client = when (message.flags and Message.Flags.OUTBOX > 0) {
-                        true -> telegram
-                        false -> {
-                            val bot = dao.getBotByVkId(message.from) ?: return@launch
-                            createBotClient(bot)
+                val lock = getChatLock(chat)
+                try {
+                    logger.info("VK Locking on lock ${lock.hashCode()}")
+                    lock.withLock {
+                        logger.info("VK Locked")
+                        if (dao.isSyncedVk(chat, message.messageId)) return@launch
+
+                        val client = when (message.flags and Message.Flags.OUTBOX > 0) {
+                            true -> telegram
+                            false -> {
+                                val bot = dao.getBotByVkId(message.from) ?: return@launch
+                                createBotClient(bot)
+                            }
                         }
-                    }
 
-                    when (chat.type) {
-                        ChatType.PRIVATE -> {
-                            val recipient = if (client == telegram) chat.telegramId else telegram.myId
-                            sendVkMessage(client, chat, recipient.toLong(), message)
-                        }
-                        ChatType.GROUP -> {
-                            val groupId = chat.telegramId
-                            val group = client.groupById(groupId)
+                        when (chat.type) {
+                            ChatType.PRIVATE -> {
+                                val recipient = if (client == telegram) chat.telegramId else telegram.myId
+                                sendVkMessage(client, chat, recipient.toLong(), message)
+                            }
+                            ChatType.GROUP -> {
+                                val groupId = chat.telegramId
+                                val group = client.groupById(groupId)
 
-                            if (group == null) {
-                                val newGroup = telegram.groupById(groupId)
-                                        ?: throw IllegalStateException("User left group") // TODO: Handle leaving group
-                                telegram.chatAddUser(newGroup.id, client.myId)
+                                if (group == null) {
+                                    val newGroup = telegram.groupById(groupId)
+                                            ?: throw IllegalStateException("User left group") // TODO: Handle leaving group
+                                    telegram.chatAddUser(newGroup.id, client.myId)
 
-                                val joinedGroup = client.groupById(groupId)
-                                        ?: throw IllegalStateException("Failed to add bot to group") // TODO: Handle add failure
+                                    val joinedGroup = client.groupById(groupId)
+                                            ?: throw IllegalStateException("Failed to add bot to group") // TODO: Handle add failure
 
-                                sendVkMessage(client, chat, joinedGroup.id, message)
-                            } else {
-                                sendVkMessage(client, chat, group.id, message)
+                                    sendVkMessage(client, chat, joinedGroup.id, message)
+                                } else {
+                                    sendVkMessage(client, chat, group.id, message)
+                                }
                             }
                         }
                     }
+                } finally {
+                    logger.info("VK Unlocked ${lock.hashCode()}")
                 }
             }
         }

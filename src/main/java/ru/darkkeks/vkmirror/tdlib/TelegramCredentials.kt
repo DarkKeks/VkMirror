@@ -19,7 +19,7 @@ class TelegramCredentials(
 
     val credentialsFunction: TdApi.Function get() = when {
         isBot -> CheckAuthenticationBotToken(botToken)
-        else -> SetAuthenticationPhoneNumber(phoneNumber, false, false)
+        else -> SetAuthenticationPhoneNumber(phoneNumber, TdApi.PhoneNumberAuthenticationSettings(false, true, false))
     }
 
     val dataDirectory: String get() = when {

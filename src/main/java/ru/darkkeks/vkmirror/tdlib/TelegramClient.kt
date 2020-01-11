@@ -7,6 +7,7 @@ import ru.darkkeks.vkmirror.tdlib.internal.TdClient
 import ru.darkkeks.vkmirror.util.EventHandler
 import ru.darkkeks.vkmirror.util.createLogger
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.reflect.KClass
 
 class TelegramClient(credentials: TelegramCredentials) {
@@ -25,7 +26,7 @@ class TelegramClient(credentials: TelegramCredentials) {
     private val chats = mutableMapOf<Long, TdApi.Chat>()
     private val supergroups = mutableMapOf<Int, TdApi.Supergroup>()
 
-    private val pendingMessages = mutableMapOf<Long, CompletableDeferred<TdApi.Message>>()
+    private val pendingMessages = ConcurrentHashMap<Long, CompletableDeferred<TdApi.Message>>()
 
     init {
         updateHandler.apply {

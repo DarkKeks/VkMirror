@@ -9,9 +9,7 @@ import ru.darkkeks.vkmirror.tdlib.TelegramClient
 import ru.darkkeks.vkmirror.tdlib.internal.TdApi
 
 
-class BotAutoReg(kodein: Kodein) {
-
-    val client: TelegramClient by kodein.instance()
+class BotAutoReg(val client: TelegramClient) {
 
     private val actions = Channel<BotFatherAction<*>>()
     private val responses = Channel<TdApi.Message>()

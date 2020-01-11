@@ -1,9 +1,9 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("java")
-    id("application")
     kotlin("jvm") version "1.3.61"
+    id("application")
+    id("com.github.johnrengelman.shadow") version "4.0.1"
 }
 
 group = "ru.darkkeks"
@@ -36,14 +36,6 @@ dependencies {
 repositories {
     mavenCentral()
     jcenter()
-}
-
-// TODO Doesn't work with kotlin?
-tasks.withType(JavaExec::class) {
-    file("local.env").readLines().filter { it.contains("=") }.forEach {
-        val (key, value) = it.split("=", limit = 2)
-        environment(key, value)
-    }
 }
 
 tasks.withType<KotlinCompile>().all {

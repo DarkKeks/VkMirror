@@ -3,6 +3,7 @@ package ru.darkkeks.vkmirror.vk
 import com.vk.api.sdk.client.VkApiClient
 import com.vk.api.sdk.client.actors.UserActor
 import com.vk.api.sdk.exceptions.ApiException
+import com.vk.api.sdk.objects.enums.DocsType
 import com.vk.api.sdk.objects.users.Fields
 import com.vk.api.sdk.queries.messages.MessagesSendQuery
 import kotlinx.coroutines.Dispatchers
@@ -125,8 +126,30 @@ class VkController(kodein: Kodein) {
         return "photo${savedPhoto.ownerId}_${savedPhoto.id}_${savedPhoto.accessKey}"
     }
 
-    fun uploadVideoAttachment(filePath: String): String? {
-        throw UnsupportedOperationException("Video upload is not supported yet")
+    suspend fun uploadVideoAttachment(filePath: String): String? {
+        val uploadServer = client.videos().save(actor)
+                .isPrivate(true)
+                .executeSuspending()
+
+        val savedVideo = client.upload().video(uploadServer.uploadUrl.toString(), File(filePath))
+                .executeSuspending()
+
+        return "video${uploadServer.ownerId}_${savedVideo.videoId}"
+    }
+
+    suspend fun uploadDocumentAttachment(peerId: Int, filePath: String): String? {
+        val uploadServer = client.docs().getMessagesUploadServer(actor)
+                .peerId(peerId)
+                .type(DocsType.DOC)
+                .executeSuspending()
+
+        val document = client.upload().doc(uploadServer.uploadUrl.toString(), File(filePath))
+                .executeSuspending()
+
+        val savedDocument = client.docs().save(actor, document.file)
+                .executeSuspending()
+
+        return "doc${savedDocument.doc.ownerId}_${savedDocument.doc.id}_${savedDocument.doc.accessKey}"
     }
 
     companion object {

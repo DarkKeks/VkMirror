@@ -28,74 +28,60 @@ class VkMessageAdapter(val vk: VkController, kodein: Kodein) {
             }
             is TdApi.MessageAnimation -> {
                 val text: String = content.caption.text
-                val query = queryProvider().message(text).dontParseLinks(true)
+                val query = queryProvider()
 
-                val animation: TdApi.Animation = content.animation
-                val file = telegram.downloadFile(animation.animation)
-                logger.info("Downloaded file: {}", file)
-                val attachment = if (!file.local.isDownloadingCompleted) {
-                    logger.error("Failed to adapt animation message, file isn't downloaded")
-                    null
-                } else {
-                    when (animation.mimeType) {
-                        "image/gif" -> vk.uploadPhotoAttachment(peerId, file.local.path)
-                        "video/mp4" -> vk.uploadVideoAttachment(file.local.path)
+                val send = processAttachment(text, content.animation.animation, query) {
+                    when (content.animation.mimeType) {
+                        "image/gif" -> vk.uploadPhotoAttachment(peerId, it)
+                        "video/mp4" -> vk.uploadVideoAttachment(it)
                         else -> null
                     }
                 }
 
-                if (attachment != null) {
-                    query.attachment(attachment)
-                }
-
-                if (attachment != null || text.isNotBlank()) {
+                if (send) {
                     add(query)
                 }
             }
             is TdApi.MessageAudio -> Unit
             is TdApi.MessageDocument -> {
-
+                val query = queryProvider()
+                val text = content.caption.text
+                val document = content.document.document
+                if (processAttachment(text, document, query) { vk.uploadDocumentAttachment(peerId, it) }) {
+                    add(query)
+                }
             }
             is TdApi.MessagePhoto -> {
-                val text: String = content.caption.text
-                val query = queryProvider().dontParseLinks(true)
-
-                if (text.isNotBlank()) {
-                    query.message(text)
-                }
-
-                val photo = content.photo
-                val attachment = if (photo.sizes.isNotEmpty()) {
-                    val best = photo.sizes.maxBy { it.height * it.width } ?: throw IllegalStateException()
-                    val file = telegram.downloadFile(best.photo)
-
-                    if (!file.local.isDownloadingCompleted) {
-                        logger.error("Failed to adapt photo message, file isn't downloaded")
-                        null
-                    } else {
-                        vk.uploadPhotoAttachment(peerId, file.local.path)
-                    }
-                } else {
-                    null
-                }
-
-                if (attachment != null) {
-                    query.attachment(attachment)
-                }
-
-                if (attachment != null || text.isNotBlank()) {
+                val text = content.caption.text
+                val query = queryProvider()
+                val file = content.photo.sizes.maxBy { it.height * it.width }
+                        ?: throw IllegalStateException("Photo without sizes")
+                if (processAttachment(text, file.photo, query) { vk.uploadPhotoAttachment(peerId, it) }) {
                     add(query)
                 }
             }
             is TdApi.MessageExpiredPhoto -> Unit
             is TdApi.MessageSticker -> {
-
+                val query = queryProvider()
+                val file = content.sticker.thumbnail.photo
+                if (processAttachment(null, file, query) { vk.uploadPhotoAttachment(peerId, it) }) {
+                    add(query)
+                }
             }
             is TdApi.MessageVideo -> {
-
+                val query = queryProvider()
+                val text = content.caption.text
+                if (processAttachment(text, content.video.video, query) { vk.uploadVideoAttachment(it) }) {
+                    add(query)
+                }
             }
             is TdApi.MessageExpiredVideo -> Unit
-            is TdApi.MessageVideoNote -> Unit
+            is TdApi.MessageVideoNote -> {
+                val query = queryProvider()
+                if (processAttachment(null, content.videoNote.video, query) { vk.uploadVideoAttachment(it) }) {
+                    add(query)
+                }
+            }
             is TdApi.MessageVoiceNote -> Unit
             is TdApi.MessageLocation -> Unit
             is TdApi.MessageVenue -> Unit
@@ -127,6 +113,33 @@ class VkMessageAdapter(val vk: VkController, kodein: Kodein) {
             is TdApi.MessagePassportDataReceived -> Unit
             is TdApi.MessageUnsupported -> Unit
         }
+    }
+
+    private suspend fun processAttachment(text: String?, file: TdApi.File, query: MessagesSendQuery, attach: suspend (String) -> String?): Boolean {
+        query.dontParseLinks(true)
+
+        val nonEmptyText = if (text == null || text.isBlank()) null else text
+
+
+        val downloaded = telegram.downloadFile(file)
+        logger.info("Downloaded file: {}", file)
+
+        val attachment = if (downloaded.local.isDownloadingCompleted) {
+            attach(downloaded.local.path)
+        } else {
+            logger.error("Failed to download file {}", downloaded)
+            null
+        }
+
+        if (nonEmptyText != null) {
+            query.message(nonEmptyText)
+        }
+
+        if (attachment != null) {
+            query.attachment(attachment)
+        }
+
+        return nonEmptyText != null || attachment != null
     }
 
     companion object {

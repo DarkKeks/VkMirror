@@ -14,6 +14,7 @@ import org.kodein.di.Kodein
 import org.kodein.di.generic.instance
 import ru.darkkeks.vkmirror.tdlib.internal.TdApi
 import ru.darkkeks.vkmirror.util.createLogger
+import ru.darkkeks.vkmirror.vk.`object`.Message
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URL
@@ -27,7 +28,8 @@ class VkController(kodein: Kodein) {
     private val client: VkApiClient by kodein.instance()
     private val actor: UserActor by kodein.instance()
 
-    private val messageAdapter = VkMessageAdapter(this, kodein)
+    private val vkMessageAdapter = VkMessageAdapter(this, kodein)
+    private val telegramMessageAdapter = TelegramMessageAdapter(this, kodein)
 
     suspend fun runLongPoll(handler: UserLongPollListener) {
         val longPoll = UserLongPoll(client, actor, handler)
@@ -39,9 +41,13 @@ class VkController(kodein: Kodein) {
     }
 
     suspend fun adaptMessage(peerId: Int, message: TdApi.Message): List<MessagesSendQuery> {
-        return messageAdapter.adapt(peerId, message) {
+        return vkMessageAdapter.adapt(peerId, message) {
             client.messages().send(actor).peerId(peerId)
         }
+    }
+
+    suspend fun adaptMessage(message: Message): List<TdApi.InputMessageContent> {
+        return telegramMessageAdapter.adapt(message)
     }
 
     /**
@@ -84,17 +90,10 @@ class VkController(kodein: Kodein) {
 
         photo ?: return null
 
-        return withContext(Dispatchers.IO) {
-            val file = Files.createTempFile("vkmirror-image-", null)
-            val channel = Channels.newChannel(photo.openStream())
-            val outputStream = FileOutputStream(file.toFile())
-            outputStream.channel.transferFrom(channel, 0, Long.MAX_VALUE)
-
-            file
-        }
+        return downloadFile(photo)
     }
 
-    suspend fun getChannelTitle(peerId: Int): String = when {
+    suspend fun getChatTitle(peerId: Int): String = when {
         isMultichat(peerId) -> {
             val chat = client.messages().getChatPreview(actor).peerId(peerId).executeSuspending()
             chat.preview.title
@@ -107,6 +106,11 @@ class VkController(kodein: Kodein) {
             val users = client.users().get(actor).userIds(peerId.toString()).executeSuspending()
             "${users[0].firstName} ${users[0].lastName}"
         }
+    }
+
+    suspend fun getMultichatMembers(peerId: Int): List<Int> {
+        val chat = client.messages().getChatPreview(actor).peerId(peerId).executeSuspending()
+        return chat.profiles.map { it.id }
     }
 
     suspend fun uploadPhotoAttachment(peerId: Int, filePath: String): String? {
@@ -126,9 +130,10 @@ class VkController(kodein: Kodein) {
         return "photo${savedPhoto.ownerId}_${savedPhoto.id}_${savedPhoto.accessKey}"
     }
 
-    suspend fun uploadVideoAttachment(filePath: String): String? {
+    suspend fun uploadVideoAttachment(filePath: String, repeat: Boolean = false): String? {
         val uploadServer = client.videos().save(actor)
                 .isPrivate(true)
+                .repeat(repeat)
                 .executeSuspending()
 
         val savedVideo = client.upload().video(uploadServer.uploadUrl.toString(), File(filePath))
@@ -150,6 +155,21 @@ class VkController(kodein: Kodein) {
                 .executeSuspending()
 
         return "doc${savedDocument.doc.ownerId}_${savedDocument.doc.id}_${savedDocument.doc.accessKey}"
+    }
+
+    suspend fun downloadFile(url: URL): Path? {
+        return withContext(Dispatchers.IO) {
+            val file = Files.createTempFile("vkmirror-image-", null)
+            val channel = Channels.newChannel(url.openStream())
+            val outputStream = FileOutputStream(file.toFile())
+            outputStream.channel.transferFrom(channel, 0, Long.MAX_VALUE)
+
+            file
+        }
+    }
+
+    suspend fun getMessageById(messageId: Int): com.vk.api.sdk.objects.messages.Message? {
+        return client.messages().getById(actor, messageId).executeSuspending().items.first()
     }
 
     companion object {

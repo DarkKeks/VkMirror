@@ -124,7 +124,10 @@ class TelegramClient(credentials: TelegramCredentials) {
     }
 
     suspend fun sendMessage(chatId: Long, text: String): TdApi.Message {
-        val message = TdApi.InputMessageText(TdApi.FormattedText(text, null), false, true)
+        return sendMessage(chatId, TdApi.InputMessageText(TdApi.FormattedText(text, null), false, true))
+    }
+
+    suspend fun sendMessage(chatId: Long, message: TdApi.InputMessageContent): TdApi.Message {
         val request = TdApi.SendMessage(chatId, 0, TdApi.SendMessageOptions(false, false, null), null, message)
         val temporaryMessage = client.request(request) as TdApi.Message
         val deferred = CompletableDeferred<TdApi.Message>()

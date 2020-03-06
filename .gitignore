@@ -4,6 +4,7 @@ out
 build
 .gradle
 logs
+env.sh
 
 /tdlib*
 tdlib.log

@@ -1,6 +1,7 @@
 package ru.darkkeks.vkmirror
 
 import com.google.gson.GsonBuilder
+import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
 import com.mongodb.MongoCredential
 import com.vk.api.sdk.client.VkApiClient
@@ -28,6 +29,8 @@ val API_ID = getEnv("API_ID").toInt()
 val API_HASH = getEnv("API_HASH")
 
 val PHONE_NUMBER = getEnv("PHONE_NUMBER")
+
+val MONGO_CONN: String = System.getenv("MONGO_CONN") ?: "mongodb://root:root@localhost/admin"
 
 
 val logger: Logger = LoggerFactory.getLogger("main")
@@ -57,9 +60,12 @@ val kodein = Kodein {
     }
 
     bind<CoroutineDatabase>() with singleton {
-        val credential = MongoCredential.createCredential("root", "admin", "root".toCharArray())
-        KMongo.createClient(MongoClientSettings.builder().credential(credential).build()).coroutine
-                .getDatabase("vk_mirror")
+        val connectionString = ConnectionString(MONGO_CONN)
+        val settings = MongoClientSettings.builder()
+                .applyConnectionString(connectionString)
+                .build()
+        val database = connectionString.database ?: throw IllegalStateException("No db in connection string")
+        KMongo.createClient(settings).coroutine.getDatabase(database)
     }
 }
 

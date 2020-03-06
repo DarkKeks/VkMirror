@@ -1,5 +1,7 @@
 package ru.darkkeks.vkmirror.util
 
+import com.google.gson.JsonArray
+import com.google.gson.JsonElement
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -33,4 +35,9 @@ inline fun <T> buildList(block: ListBuilder<T>.() -> Unit): List<T> {
     val builder = ListBuilder<T>()
     builder.block()
     return builder.build()
+}
+
+
+fun JsonArray.getNullable(index: Int): JsonElement? {
+    return if (size() <= index) null else get(index)
 }

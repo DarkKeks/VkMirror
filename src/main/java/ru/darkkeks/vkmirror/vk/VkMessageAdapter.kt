@@ -33,7 +33,7 @@ class VkMessageAdapter(val vk: VkController, kodein: Kodein) {
                 val send = processAttachment(text, content.animation.animation, query) {
                     when (content.animation.mimeType) {
                         "image/gif" -> vk.uploadPhotoAttachment(peerId, it)
-                        "video/mp4" -> vk.uploadVideoAttachment(it)
+                        "video/mp4" -> vk.uploadVideoAttachment(it, repeat = true)
                         else -> null
                     }
                 }

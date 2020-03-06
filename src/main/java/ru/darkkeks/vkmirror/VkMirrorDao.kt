@@ -23,7 +23,7 @@ class VkMirrorDao(kodein: Kodein) {
     }
 
     suspend fun getChatByVkId(vkId: Int): Chat? {
-        return chats.findOne(Chat::vkPeerId eq vkId)
+        return chats.findOne(Chat::peerId eq vkId)
     }
 
     suspend fun saveMirrorChat(chat: Chat) {
